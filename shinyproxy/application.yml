@@ -55,3 +55,10 @@ proxy:
       logo-url: "/images/bioinfo_scientists.jpg"
       container-image: ghcr.io/zhongyuli2026/shiny-scvizapp:latest
       port: 3838
+    - id: feavisapp
+      display-name: "FeaVis App"
+      description: "Functional enrichment analysis visualization application."
+      container-image: ghcr.io/zhongyuli2026/shiny-feavisapp:latest
+      port: 3838
+      container-volumes:
+        - /srv/data/feavis_data/:/srv/data/feavis_data/

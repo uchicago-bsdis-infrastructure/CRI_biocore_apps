@@ -131,15 +131,32 @@ If the app needs secret data files mounted from the server, also add:
 
 ---
 
-## Step 4 — Dashboard template
+## Step 4 — Dashboard thumbnail image
 
-Read `shinyproxy/templates/index.html`. Find the `th:with` image mapping block and add a line **before** the final `'/images/banner.jpg'` fallback:
+First, scan the app folder for image files (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`).
+
+**If an image is found in the app folder:**
+- Tell the user which file was found (e.g., `apps/<folder-name>/thumbnail.jpg`)
+- Ask: "I found `<filename>` in your app folder — use this as the dashboard thumbnail?"
+- If yes:
+  - Verify the file extension is one of: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`. If not, warn the user and fall back to `banner.jpg`.
+  - Copy the file to `static/images/<image-name>.jpg` (use the image name, e.g., `shiny-024-optgroup-selectize.jpg`). If the source extension is not `.jpg`, keep the original extension (e.g., `shiny-024-optgroup-selectize.png`).
+  - Use `/images/<image-name>.<ext>` as the thumbnail path in the template.
+- If no: use `banner.jpg` as the default.
+
+**If no image is found in the app folder:**
+- Ask: "Do you have a thumbnail image to upload? If so, place it in `apps/<folder-name>/` and re-run, or I'll use the default `banner.jpg`."
+- Proceed with `banner.jpg` as the default unless the user provides one.
+
+**Then update `shinyproxy/templates/index.html`:**
+
+Read the file. Find the `th:with` image mapping block and add a line **before** the final `'/images/banner.jpg'` fallback:
 
 ```html
-(${app.id == '<app-id>'} ? '/images/<app-image>.jpg' :
+(${app.id == '<app-id>'} ? '/images/<thumbnail-filename>' :
 ```
 
-Ask the user if they have a thumbnail image to add to `static/images/`. If not, `banner.jpg` will be used as the default — that's fine.
+If using `banner.jpg` as default, still add the mapping line (it will just point to `banner.jpg`) so the app is explicitly handled.
 
 ---
 
