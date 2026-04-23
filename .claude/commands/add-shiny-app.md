@@ -65,7 +65,7 @@ If a package is not in this table, use your knowledge of its compiled dependenci
 Construct the Dockerfile with **only the system libraries actually needed**, split into logical layers:
 
 ```dockerfile
-FROM rocker/shiny:latest
+FROM rocker/shiny:4.4.2
 
 # System dependencies
 RUN apt-get update && apt-get install -y \

@@ -12,10 +12,6 @@ jobs:
     strategy:
       matrix:
         app:
-          - name: 001-hello
-            image: shiny-001-hello
-          - name: 006-tabsets
-            image: shiny-006-tabsets
           - name: 050-kmeans-example
             image: shiny-050-kmeans-example
           - name: DEApp-master
@@ -59,8 +55,6 @@ jobs:
           sudo /usr/bin/cp -r static/images/. /var/www/biocoreapps/images/
           sudo env LDAP_MANAGER_PASSWORD="$LDAP_MANAGER_PASSWORD" python3 -c "import os; f='/etc/shinyproxy/application.yml'; c=open(f).read().replace('\${LDAP_MANAGER_PASSWORD}',os.environ['LDAP_MANAGER_PASSWORD']); open(f,'w').write(c)"
           echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-001-hello:latest
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-006-tabsets:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-050-kmeans-example:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-deapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavis:latest

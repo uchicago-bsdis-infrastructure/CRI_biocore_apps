@@ -19,18 +19,6 @@ proxy:
     internal-networking: false
     url: http://localhost:2375
   specs:
-    - id: hello
-      display-name: "Hello Shiny"
-      description: "A simple Hello World Shiny app."
-      logo-url: "/images/bioinfo_scientists.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-001-hello:latest
-      port: 3838
-    - id: tabsets
-      display-name: "Tabsets"
-      description: "Demonstrates tabset panels in Shiny."
-      logo-url: "/images/spotlight01.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-006-tabsets:latest
-      port: 3838
     - id: kmeans
       display-name: "K-Means Clustering"
       description: "Interactive K-Means clustering visualization."
