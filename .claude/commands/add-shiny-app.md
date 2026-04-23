@@ -86,6 +86,13 @@ EXPOSE 3838
 CMD ["/usr/bin/shiny-server"]
 ```
 
+**If the app requires data mounting**, add this line after `FROM` to pin the shiny user UID to match server directory ownership:
+
+```dockerfile
+# Pin shiny UID to match server directory ownership (/srv/data/ is chowned to 997)
+RUN usermod -u 997 shiny
+```
+
 Show the user the detected packages and the resolved system dependencies before writing the Dockerfile, and ask them to confirm or add anything missing.
 
 ---
@@ -123,11 +130,17 @@ Read the file first, then add:
       port: 3838
 ```
 
-If the app needs secret data files mounted from the server, also add:
+If the app needs data files mounted from the server, also add:
 ```yaml
       container-volumes:
-        - /srv/shinydata/<folder-name>:/data
+        - /srv/data/<folder-name>/:/srv/data/<folder-name>/
 ```
+
+> **UID requirement:** Host directories under `/srv/data/` must be owned by UID 997 (the container's shiny user). On the server run:
+> ```bash
+> sudo chown -R 997 /srv/data/<folder-name>/
+> ```
+> Also add `RUN usermod -u 997 shiny` to the Dockerfile (see above).
 
 ---
 
