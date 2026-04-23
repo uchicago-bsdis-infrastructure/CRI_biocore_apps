@@ -1,4 +1,4 @@
-FROM rocker/shiny:latest
+FROM rocker/shiny:4.4.2
 
 RUN R -e "install.packages(c('shinydashboard', 'shinyWidgets', 'shinyjs', 'shinyFiles', 'dplyr', 'DT', 'ggplot2', 'readxl', 'openxlsx'))"
 
