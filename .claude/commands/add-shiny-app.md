@@ -86,11 +86,11 @@ EXPOSE 3838
 CMD ["/usr/bin/shiny-server"]
 ```
 
-**If the app requires data mounting**, add this line after `FROM` to pin the shiny user UID to match server directory ownership:
+**If the app requires data mounting**, add this line after `FROM` to remap the container's shiny user to match the host's shiny UID (992), so the container process can access host-owned directories securely:
 
 ```dockerfile
-# Pin shiny UID to match server directory ownership (/srv/data/ is chowned to 997)
-RUN usermod -u 997 shiny
+# Pin shiny UID to match host shiny user (UID 992) for volume mount permissions
+RUN usermod -u 992 shiny
 ```
 
 Show the user the detected packages and the resolved system dependencies before writing the Dockerfile, and ask them to confirm or add anything missing.
@@ -136,11 +136,11 @@ If the app needs data files mounted from the server, also add:
         - /srv/data/<folder-name>/:/srv/data/<folder-name>/
 ```
 
-> **UID requirement:** Host directories under `/srv/data/` must be owned by UID 997 (the container's shiny user). On the server run:
+> **UID requirement:** Host directories under `/srv/data/` must be owned by the host's `shiny` user (UID 992). On the server run:
 > ```bash
-> sudo chown -R 997 /srv/data/<folder-name>/
+> sudo chown -R shiny:shiny /srv/data/<folder-name>/
 > ```
-> Also add `RUN usermod -u 997 shiny` to the Dockerfile (see above).
+> Also add `RUN usermod -u 992 shiny` to the Dockerfile (see above). This remaps the container's shiny user to UID 992, avoiding exposure of data to an uncontrolled UID on the host.
 
 ---
 

@@ -1,5 +1,8 @@
 FROM rocker/shiny:4.4.2
 
+# Pin shiny UID to match host shiny user (UID 992) for volume mount permissions
+RUN usermod -u 992 shiny
+
 # Install system dependencies (add as needed)
 RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
