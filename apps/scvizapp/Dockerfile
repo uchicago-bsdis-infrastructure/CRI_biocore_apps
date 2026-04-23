@@ -1,4 +1,4 @@
-FROM rocker/shiny:latest
+FROM rocker/shiny:4.4.2
 
 # Install system dependencies (add as needed)
 RUN apt-get update && apt-get install -y \
