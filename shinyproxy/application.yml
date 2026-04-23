@@ -19,12 +19,6 @@ proxy:
     internal-networking: false
     url: http://localhost:2375
   specs:
-    - id: kmeans
-      display-name: "K-Means Clustering"
-      description: "Interactive K-Means clustering visualization."
-      logo-url: "/images/spotlight02.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-050-kmeans-example:latest
-      port: 3838
     - id: feavis
       display-name: "FEAVis"
       description: "Functional enrichment analysis visualization."
