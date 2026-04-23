@@ -19,12 +19,6 @@ proxy:
     internal-networking: false
     url: http://localhost:2375
   specs:
-    - id: feavis
-      display-name: "FEAVis"
-      description: "Functional enrichment analysis visualization."
-      logo-url: "/images/spotlight03.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-feavis:latest
-      port: 3838
     - id: test_yanli
       display-name: "test1 yan"
       description: "test demo with zhongyu, operated by Yan"

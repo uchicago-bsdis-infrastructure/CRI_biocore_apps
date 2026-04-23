@@ -1,2 +1,0 @@
-"ID","Description","GeneRatio","BgRatio","RichFactor","FoldEnrichment","zScore","pvalue","p.adjust","qvalue","geneID","Count"
-"GO:0009214","cyclic nucleotide catabolic process","3/81","14/18986",0.214285714285714,50.2275132275132,12.0607642019552,2.63232224399219e-05,0.04382816536247,0.0411473529718779,"PDE4D/PDE1A/PDE7A",3

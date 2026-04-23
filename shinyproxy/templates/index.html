@@ -142,10 +142,9 @@
             </div>
             <div class="image"
                  th:with="imgSrc=${app.id == 'deapp'} ? '/images/deanalysis.jpg' :
-                          (${app.id == 'feavis'} ? '/images/spotlight01.jpg' :
                           (${app.id == 'test_yanli'} ? '/images/cuffdiff.jpg' :
                           (${app.id == 'feavisapp'} ? '/images/banner.jpg' :
-                          '/images/banner.jpg')))">
+                          '/images/banner.jpg'))">
                 <img th:src="${imgSrc}" th:alt="${app.displayName}" />
             </div>
         </section>

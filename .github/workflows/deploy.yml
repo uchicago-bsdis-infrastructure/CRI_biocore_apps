@@ -14,8 +14,6 @@ jobs:
         app:
           - name: DEApp-master
             image: shiny-deapp
-          - name: feavis
-            image: shiny-feavis
           - name: test1-demo
             image: shiny-test1
           - name: scvizapp
@@ -54,7 +52,6 @@ jobs:
           sudo env LDAP_MANAGER_PASSWORD="$LDAP_MANAGER_PASSWORD" python3 -c "import os; f='/etc/shinyproxy/application.yml'; c=open(f).read().replace('\${LDAP_MANAGER_PASSWORD}',os.environ['LDAP_MANAGER_PASSWORD']); open(f,'w').write(c)"
           echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-deapp:latest
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavis:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-test1:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-scvizapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavisapp:latest
