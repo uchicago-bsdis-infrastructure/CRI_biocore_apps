@@ -19,8 +19,8 @@ That's it. Skills in `.claude/commands/` are automatically available in any Clau
 
 ## Available skills
 
-| Command | What it does |
-|---|---|
+| Command          | What it does                                                           |
+| ---------------- | ---------------------------------------------------------------------- |
 | `/add-shiny-app` | Interactively walks you through adding and registering a new Shiny app |
 
 ---
@@ -79,12 +79,12 @@ Claude will show you the detected packages and system deps **before writing anyt
 
 Claude will make one edit at a time and pause for your confirmation:
 
-| Edit | File |
-|---|---|
-| Create Dockerfile | `apps/<your-app-name>/Dockerfile` |
-| Add matrix + deploy entries | `.github/workflows/deploy.yml` |
-| Add app spec | `shinyproxy/application.yml` or `application-public.yml` |
-| Add image mapping | `shinyproxy/templates/index.html` |
+| Edit                        | File                                                     |
+| --------------------------- | -------------------------------------------------------- |
+| Create Dockerfile           | `apps/<your-app-name>/Dockerfile`                        |
+| Add matrix + deploy entries | `.github/workflows/deploy.yml`                           |
+| Add app spec                | `shinyproxy/application.yml` or `application-public.yml` |
+| Add image mapping           | `shinyproxy/templates/index.html`                        |
 
 ### Step 7 — Create a branch and open a PR
 
@@ -140,13 +140,16 @@ Claude: Writing Dockerfile ... done.
 ## Troubleshooting
 
 **Skill not found (`/add-shiny-app` not recognized)**
+
 - Make sure you launched `claude` from inside the `CRI_biocore_apps` directory
 - The `.claude/commands/` folder must be present (it is tracked in git)
 
 **Claude edited the wrong indentation in `deploy.yml`**
+
 - Tell Claude: "the indentation looks off, please re-read the file and fix it"
 - YAML requires spaces only — tabs cause "Invalid workflow file" errors
 
 **App not appearing after merge**
+
 - Check the GitHub Actions tab for build/deploy errors
 - Red X → click into the job to read the logs

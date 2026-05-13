@@ -24,3 +24,8 @@ proxy:
       logo-url: "/images/deanalysis.jpg"
       container-image: ghcr.io/zhongyuli2026/shiny-deapp:latest
       port: 3838
+    - id: 030_basic_datatable
+      display-name: "DataTable Demo App"
+      description: "Interactive filtering and display of tabular data using DataTables, with selectable filters for manufacturer, transmission, and cylinders."
+      container-image: ghcr.io/zhongyuli2026/shiny-030-basic-datatable:latest
+      port: 3838

@@ -20,6 +20,8 @@ jobs:
             image: shiny-scvizapp
           - name: feavisApp
             image: shiny-feavisapp
+          - name: 030-basic-datatable
+            image: shiny-030-basic-datatable
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
@@ -55,6 +57,7 @@ jobs:
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-test1:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-scvizapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavisapp:latest
+          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-030-basic-datatable:latest
           sudo /usr/bin/systemctl restart shinyproxy
           sudo /usr/bin/systemctl restart shinyproxy-public
           docker system prune -f
