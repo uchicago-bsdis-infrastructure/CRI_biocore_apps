@@ -40,3 +40,8 @@ proxy:
       port: 3838
       container-volumes:
         - /srv/data/feavis_data/:/srv/data/feavis_data/
+    - id: tfheatmap
+      display-name: "TFHeatmap"
+      description: "Visualize potential master TFs and gene modules across pathways using DAP-seq TF target data and conservation scores."
+      container-image: ghcr.io/zhongyuli2026/shiny-tfheatmap:latest
+      port: 3838
