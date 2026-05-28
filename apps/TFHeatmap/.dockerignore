@@ -1,0 +1,5 @@
+.git
+.gitignore
+*.pdf
+.DS_Store
+agent-transcripts
