@@ -19,12 +19,6 @@ proxy:
     internal-networking: false
     url: http://localhost:2375
   specs:
-    - id: test_yanli
-      display-name: "test1 yan"
-      description: "test demo with zhongyu, operated by Yan"
-      logo-url: "/images/bioinfo_scientists.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-test1:latest
-      port: 3838
     - id: scvizapp
       display-name: "scVizApp"
       description: "scRNASeq Visualization Application"
