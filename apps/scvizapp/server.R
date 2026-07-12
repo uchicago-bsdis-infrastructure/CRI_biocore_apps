@@ -4,6 +4,11 @@ library(ggplot2)
 library(patchwork)
 library(cowplot)
 library(tibble)
+# library(presto)
+library(dittoSeq)
+library(Polychrome)
+library(viridis)
+library(viridisLite)
 options(warn = -1)
 
 options(shiny.maxRequestSize = 30 * 1024 ^ 3)
@@ -12,6 +17,67 @@ trim <- function (x)
   gsub("^\\s+|\\s+$", "", x)
 source('formatRDSFile.R')
 # setwd('/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/') #Remove before push
+## ---------------------------------------------------------------------------- ##
+
+get_discrete_palette <- function(n, package = "Default", palette_name = NULL) {
+  
+  if (is.null(n) || n < 1) n <- 1
+  
+  cols <- switch(package,
+                 
+                 "Default" = NULL,   # let Seurat pick default (ggplot hue_pal)
+                 
+                 "dittoSeq" = {
+                   all_cols <- dittoSeq::dittoColors()   # 40 colors
+                   if (n <= length(all_cols)) {
+                     all_cols[seq_len(n)]
+                   } else {
+                     rep(all_cols, length.out = n)
+                   }
+                 },
+                 
+                 "Polychrome" = {
+                   pal_func <- switch(palette_name %||% "glasbey",
+                                      "glasbey"  = Polychrome::glasbey.colors,
+                                      "alphabet" = Polychrome::alphabet.colors,
+                                      "kelly"    = Polychrome::kelly.colors,
+                                      "dark"     = Polychrome::dark.colors,
+                                      "light"    = Polychrome::light.colors,
+                                      Polychrome::glasbey.colors
+                   )
+                   max_n <- switch(palette_name %||% "glasbey",
+                                   "glasbey" = 32, "alphabet" = 26, "kelly" = 22,
+                                   "dark" = 24, "light" = 24, 32
+                   )
+                   as.character(pal_func(min(n, max_n)))
+                 },
+                 
+                 NULL   # fallback: default
+  )
+  
+  unname(cols)
+}
+
+get_continuous_palette <- function(package = "Default", palette_name = NULL) {
+  
+  switch(package,
+         
+         "Default" = c("lightgrey", "blue"),   # Seurat's default
+         
+         "viridis" = {
+           opt <- switch(palette_name %||% "viridis",
+                         "viridis" = "D", "magma" = "A", "inferno" = "B",
+                         "plasma"  = "C", "cividis" = "E", "turbo" = "H",
+                         "mako"    = "G", "rocket" = "F",
+                         "D"
+           )
+           viridis::viridis(100, option = opt)
+         },
+         
+         c("lightgrey", "blue")
+  )
+}
+
 ## ---------------------------------------------------------------------------- ##
 # Analysis Description
 metadata_literature_summary_auto <- function(rds_path, max_unique = 10) {
@@ -61,6 +127,7 @@ metadata_literature_summary_auto <- function(rds_path, max_unique = 10) {
     `Values` = sapply(meta, function(x) {
       ux <- unique(x)
       ux <- ux[!is.na(ux)]
+      ux <- stringr::str_sort(ux, numeric = TRUE)
       paste(ux, collapse = ", ")
     })
   )
@@ -157,7 +224,10 @@ plot_cluster_barplot <- function(cluster_summary,
                                  perPlotHeight = NULL,
                                  perPlotWidth = NULL,
                                  stack = FALSE,
-                                 gap = 0.85) {
+                                 gap = 0.85,
+                                 barPlotXtextSize = 14,
+                                 barPlotYtextSize = 14,
+                                 barPlotLtextSize = 14) {
   
   # Color function
   ggplotColours <- function(n = 6, h = c(0, 360) + 15) {
@@ -249,10 +319,10 @@ plot_cluster_barplot <- function(cluster_summary,
   # Formatting
   g1 <- g1 +
     theme(
-      axis.text.x = element_text(size = 14),
-      axis.text.y = element_text(size = 14),
+      axis.text.x = element_text(size = barPlotXtextSize),
+      axis.text.y = element_text(size = barPlotYtextSize),
       legend.title = element_blank(),
-      legend.text = element_text(size = 14),
+      legend.text = element_text(size = barPlotLtextSize),
       panel.grid.major = element_line(color = "grey85")
     )
   
@@ -263,6 +333,7 @@ plot_cluster_barplot <- function(cluster_summary,
   
   return(g1)
 }
+
 
 normalize_string <- function(x) {
   # Lowercase + remove spaces
@@ -443,8 +514,8 @@ shinyServer(function(input, output, session) {
   # Define reactive data directory based on user input
   data_dir <- reactive({
     req(input$projectName)
-    file.path(getwd(), "data", input$projectName)
-    # file.path("/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/data", input$projectName)
+    # file.path(getwd(), "data", input$projectName)
+    file.path("/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/data", input$projectName)
   })
   
   # Handle submit button and validate folder
@@ -616,27 +687,27 @@ shinyServer(function(input, output, session) {
         # cluster_cols <- metadata_cols[stringr::str_detect(metadata_cols,"expCond|orig.ident|cluster|cell|Cell|Cluster|ident|Ident")]
         
         req(rds_data())
-        updateSelectizeInput(session, "Category1", choices = cluster_cols)
-        updateSelectizeInput(session, "Category2", choices = cluster_cols)
-        updateSelectizeInput(session, "MdSplitby", choices = c('None', cluster_cols))
-        updateSelectizeInput(session, "Categoryumap", choices = cluster_cols)
-        updateSelectizeInput(session, "FeatureClusterSelect", choices = cluster_cols)
-        updateSelectizeInput(session, "VlnClusterSelect", choices = cluster_cols)
-        updateSelectizeInput(session, "DotClusterSelect", choices = cluster_cols)
-        updateSelectizeInput(session, "FeatureSampleSepSelect", choices = c('None', cluster_cols))
-        updateSelectizeInput(session, "VlnSampleSepSelect", choices = c('None', cluster_cols))
-        updateSelectizeInput(session, "DotSampleSepSelect", choices = c('None', cluster_cols))
-        updateSelectizeInput(session, "MdVis", choices = reduction_names)
-        updateSelectizeInput(session, "FeatureSelectedGenes", choices = gene_names)
-        updateSelectizeInput(session, "VlnSelectedGenes", choices = gene_names)
-        updateSelectizeInput(session, "DotSelectedGenes", choices = gene_names)
-        updateSelectizeInput(session, "FeatureSelectedGenesTypes", choices = gene_type_choices)
-        updateSelectizeInput(session, "DotSelectedGenesTypes", choices = gene_type_choices)
-        updateSelectizeInput(session, "HeatmapGenes", choices = gene_names)
-        updateSelectizeInput(session, "HeatmapClusterSelect", choices = cluster_cols)
-        updateSelectizeInput(session, "HeatmapSampleSepSelect", choices = c('None', cluster_cols))
-        updateSelectizeInput(session, "RefColName", choices = cluster_cols)
-        
+        # updateSelectizeInput(session, "Category1", choices = cluster_cols)
+        # updateSelectizeInput(session, "Category2", choices = cluster_cols)
+        # updateSelectizeInput(session, "MdSplitby", choices = c('None', cluster_cols))
+        # updateSelectizeInput(session, "Categoryumap", choices = cluster_cols)
+        # updateSelectizeInput(session, "FeatureClusterSelect", choices = cluster_cols)
+        # updateSelectizeInput(session, "VlnClusterSelect", choices = cluster_cols)
+        # updateSelectizeInput(session, "DotClusterSelect", choices = cluster_cols)
+        # updateSelectizeInput(session, "FeatureSampleSepSelect", choices = c('None', cluster_cols))
+        # updateSelectizeInput(session, "VlnSampleSepSelect", choices = c('None', cluster_cols))
+        # updateSelectizeInput(session, "DotSampleSepSelect", choices = c('None', cluster_cols))
+        # updateSelectizeInput(session, "MdVis", choices = reduction_names)
+        # updateSelectizeInput(session, "FeatureSelectedGenes", choices = gene_names)
+        # updateSelectizeInput(session, "VlnSelectedGenes", choices = gene_names)
+        # updateSelectizeInput(session, "DotSelectedGenes", choices = gene_names)
+        # updateSelectizeInput(session, "FeatureSelectedGenesTypes", choices = gene_type_choices)
+        # updateSelectizeInput(session, "DotSelectedGenesTypes", choices = gene_type_choices)
+        # updateSelectizeInput(session, "HeatmapGenes", choices = gene_names)
+        # updateSelectizeInput(session, "HeatmapClusterSelect", choices = cluster_cols)
+        # updateSelectizeInput(session, "HeatmapSampleSepSelect", choices = c('None', cluster_cols))
+        # updateSelectizeInput(session, "RefColName", choices = cluster_cols)
+        # 
         updateProgressBar(
           session = session,
           id = "load2",
@@ -657,7 +728,7 @@ shinyServer(function(input, output, session) {
         output$FeaturePlot <- renderPlot(NULL)
         output$DotPlot <- renderPlot(NULL)
         output$Heatmap <- renderPlot(NULL)
-       
+        
         updateNavbarPage(session, inputId = "tabs", selected = "Cell Summary Profile")
         
         duration <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 2)
@@ -750,7 +821,7 @@ shinyServer(function(input, output, session) {
       print("Scaled data exists and is not empty")
     } else {
       print("Running ScaleData()")
-      rds_copy = Seurat::ScaleData(object = rds_copy, features = rownames(rds_copy))
+      # rds_copy = Seurat::ScaleData(object = rds_copy, features = rownames(rds_copy))
     }
     
     # Apply custom idents if they exist
@@ -794,7 +865,12 @@ shinyServer(function(input, output, session) {
   observeEvent(input$HMapSubmit,{
     updateNavbarPage(session, inputId = "tabs", selected = "Heatmaps")
   })
-  
+  observeEvent(input$ScoringSubmit,{
+    updateNavbarPage(session, inputId = "tabs", selected = "Scoring")
+  })
+  observeEvent(input$DETestingSubmit,{
+    updateNavbarPage(session, inputId = "tabs", selected = "DE Testing")
+  })
   # Add this to your server - Forces all UI elements to refresh when data updates
   observe({
     req(rds_plotdata())
@@ -805,7 +881,12 @@ shinyServer(function(input, output, session) {
 
     print(paste("Observer triggered - Available columns:",
                 paste(cluster_cols, collapse = ", ")))
-
+    reduction_names <- names(data@reductions)
+    gene_names <- rownames(data)
+    metadata_cols <- colnames(data@meta.data)
+    reduction_names <- names(data@reductions)
+    gene_type_choices <- gene_phases()
+    cluster_cols <- metadata_cols[!grepl("nCount|nFeature|percent", metadata_cols)]
     # Update ALL selectInputs that use metadata columns
     updateSelectizeInput(session, "Category1", choices = cluster_cols)
     updateSelectizeInput(session, "Category2", choices = cluster_cols)
@@ -817,15 +898,20 @@ shinyServer(function(input, output, session) {
     updateSelectizeInput(session, "FeatureSampleSepSelect", choices = c('None', cluster_cols))
     updateSelectizeInput(session, "VlnSampleSepSelect", choices = c('None', cluster_cols))
     updateSelectizeInput(session, "DotSampleSepSelect", choices = c('None', cluster_cols))
-    # updateSelectizeInput(session, "MdVis", choices = reduction_names)
-    # updateSelectizeInput(session, "FeatureSelectedGenes", choices = gene_names)
-    # updateSelectizeInput(session, "VlnSelectedGenes", choices = gene_names)
-    # updateSelectizeInput(session, "DotSelectedGenes", choices = gene_names)
-    # updateSelectizeInput(session, "FeatureSelectedGenesTypes", choices = gene_type_choices)
-    # updateSelectizeInput(session, "DotSelectedGenesTypes", choices = gene_type_choices)
-    # updateSelectizeInput(session, "HeatmapGenes", choices = gene_names)
-    updateSelectizeInput(session, "HeatmapClusterSelect", choices = cluster_cols)
-    updateSelectizeInput(session, "HeatmapSampleSepSelect", choices = c('None', cluster_cols))
+    updateSelectizeInput(session, "ScoringSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "MdVis", choices = reduction_names)
+    updateSelectizeInput(session, "FeatureSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "VlnSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "DotSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "FeatureSelectedGenesTypes", choices = gene_type_choices)
+    updateSelectizeInput(session, "DotSelectedGenesTypes", choices = gene_type_choices)
+    updateSelectizeInput(session, "HmapSelectedGenes", choices = gene_names)
+    valid_cluster_cols <- cluster_cols[sapply(cluster_cols, function(col) {
+      length(unique(data@meta.data[[col]])) > 1
+    })]
+    updateSelectizeInput(session, "HeatmapClusterSelect", choices = valid_cluster_cols)
+    updateSelectizeInput(session, "HeatmapSampleSepSelect", choices = c('None', valid_cluster_cols))
+    updateSelectizeInput(session, "DEtestingCluster", choices = valid_cluster_cols)
     updateSelectizeInput(session, "RefColName", choices = cluster_cols)
 
 
@@ -835,11 +921,11 @@ shinyServer(function(input, output, session) {
   observeEvent(list(rds_plotdata(), custom_idents()), {
     req(rds_plotdata())
     
-    showNotification(
-      "✓ Data updated throughout the app",
-      type = "message",
-      duration = 2
-    )
+    # showNotification(
+      # "✓ Data updated throughout the app",
+    #   type = "message",
+    #   duration = 2
+    # )
   })
   
   # Debug observer - remove after confirming it works
@@ -894,7 +980,10 @@ shinyServer(function(input, output, session) {
         perPlotHeight = NULL,
         perPlotWidth = NULL,
         stack = TRUE,
-        gap = 0.85
+        gap = 0.85,
+        barPlotXtextSize = as.numeric(input$barPlotXtextSize),
+        barPlotYtextSize = as.numeric(input$barPlotYtextSize),
+        barPlotLtextSize = as.numeric(input$barPlotLtextSize)
       )
     })
   })
@@ -971,19 +1060,37 @@ shinyServer(function(input, output, session) {
     req(input$MdVis)
     selected_clusters <- input$Categoryumap
     # plot_obj <- subset(seurat_obj, idents = selected_clusters)
+    # -------- Get palette --------
+    n_groups <- length(unique(as.character(data@meta.data[[cluster]])))
+    
+    palette_pkg <- input$umap_palette_package  # "Default", "dittoSeq", "Polychrome"
+    palette_name <- input$umap_palette_name    # e.g., "glasbey" for Polychrome
+    
+    cols <- get_discrete_palette(n_groups, palette_pkg, palette_name)
     
     if (input$MdSplitby != 'None') {
       DimPlot(
         data,
         reduction = input$MdVis,
         split.by = input$MdSplitby,
+        cols = cols,
         label = TRUE
-      )
+      )+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$mdPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$mdPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$mdPlotLtextSize))
+        )
     } else {
-      DimPlot(data, reduction = input$MdVis, label = TRUE)
+      DimPlot(data, reduction = input$MdVis, label = TRUE, cols = cols) +
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$mdPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$mdPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$mdPlotLtextSize))
+        )
     }
   })
-  # Render UMAP visualizations
+  
   observeEvent(input$LoadUMAP, {
     output$UMAPPlots <- renderPlot({
       suppressWarnings({
@@ -992,7 +1099,6 @@ shinyServer(function(input, output, session) {
       })
     })
   })
-  
   
   output$download_UMAPs <- downloadHandler(
     filename = function() {
@@ -1030,15 +1136,26 @@ shinyServer(function(input, output, session) {
     sprintf("3.1: Sdelected %s Violin Plots as Idents: ", cluster)
     # Set the cluster identities based on the selected cluster column in meta data
     Seurat::Idents(data) <- data@meta.data[[cluster]]
+    n_groups <- length(unique(as.character(data@meta.data[[cluster]])))
+    
+    palette_pkg <- input$vln_palette_package
+    palette_name <- input$vln_palette_name
+    
+    cols <- get_discrete_palette(n_groups, palette_pkg, palette_name)
     
     # Generate the FeaturePlot based on whether sample separation is needed
     if (input$VlnSampleSepSelect == 'None') {
       p =  Seurat::VlnPlot(data,
-                      features = as.vector(input$VlnSelectedGenes),
-                      slot = 'data',combine = FALSE
+                           features = as.vector(input$VlnSelectedGenes),
+                           slot = 'data',combine = FALSE, cols = cols
       )
       # p <- wrap_plots(p, ncol = 4) + plot_annotation(theme = theme_minimal())
-      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())
+      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal()) +
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$vlnPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$vlnPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$vlnPlotLtextSize))
+        )
       p
     } else {
       sprintf(
@@ -1050,10 +1167,15 @@ shinyServer(function(input, output, session) {
         features = as.vector(input$VlnSelectedGenes),
         slot = 'data',
         split.by = input$VlnSampleSepSelect,
-        combine = FALSE
+        combine = FALSE, cols = cols
       )
       # p <- wrap_plots(p, ncol = 2) + plot_annotation(theme = theme_minimal())
-      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())
+      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$vlnPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$vlnPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$vlnPlotLtextSize))
+        )
       p
     }
   })
@@ -1095,6 +1217,10 @@ shinyServer(function(input, output, session) {
     sprintf("4.1: Selected %s as Idents for Feature Plots: ", cluster)
     # Set the cluster identities based on the selected cluster column in meta data
     Seurat::Idents(data) <- data@meta.data[[cluster]]
+    palette_pkg <- input$fp_palette_package
+    palette_name <- input$fp_palette_name
+    
+    cols <- get_continuous_palette(palette_pkg, palette_name)
     
     # Generate the FeaturePlot based on whether sample separation is needed
     # if (input$FeatureSampleSepSelect %in% rownames(data)) {
@@ -1106,9 +1232,14 @@ shinyServer(function(input, output, session) {
         label = T,
         pt.size = 0.1,
         combine = TRUE
-      )
+      ) & scale_color_gradientn(colors = cols)
       # p <- wrap_plots(p, ncol = 4) + plot_annotation(theme = theme_minimal())
-      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())
+      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$FPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$FPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$FPlotLtextSize))
+        )
       p
     }
     else {
@@ -1122,8 +1253,13 @@ shinyServer(function(input, output, session) {
         label = T,
         pt.size = 0.1,
         combine = T
-      )
-      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())
+      ) & scale_color_gradientn(colors = cols)
+      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$FPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$FPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$FPlotLtextSize))
+        )
       p
     }
   })
@@ -1160,7 +1296,7 @@ shinyServer(function(input, output, session) {
   # 4. Render Dot Plot
   
   Dplot <- reactive({
-    req(rds_plotdata())     
+    req(rds_plotdata())
     
     data <- rds_plotdata()
     Seurat::DefaultAssay(data) <- "RNA"
@@ -1195,13 +1331,14 @@ shinyServer(function(input, output, session) {
       req(input$dotPlotFile)
       file_path <- input$dotPlotFile$datapath
       file_ext <- tools::file_ext(input$dotPlotFile$name)
-      
+      file_ext <- tolower(file_ext)
       df <- switch(
         file_ext,
         "csv"  = readr::read_csv(file_path, col_types = cols()),
         "txt"  = readr::read_delim(file_path, delim = "\t", col_types = cols()),
         "xlsx" = readxl::read_excel(file_path),
-        "xls" = readxl::read_excel(file_path),
+        "xls" = readxl::read_excel(system.file(file_path)),
+        "tsv" = readr::read_delim(system.file(file_path), delim = "\t", col_types = cols()),
         stop("Unsupported file format")
       )
       
@@ -1226,9 +1363,10 @@ shinyServer(function(input, output, session) {
         group_by       = cluster,
         marker_genes_df = gene_types_df,   # <- explicitly passing gene/geneType df
         # split.by = input$DotSampleSepSelect,
-        fontsize_x     = 8,
-        fontsize_y     = 8,
-        fontangle_x    = 45,
+        dotPlotXtextSize     = as.numeric(input$dotPlotXtextSize),
+        dotPlotYtextSize     = as.numeric(input$dotPlotYtextSize),
+        dotPlotLtextSize     = as.numeric(input$dotPlotLtextSize),
+        fontangle_x    = as.numeric(input$dotPlotXangle),
         genetypebar_per = 0.05,
         legend_per     = 0.2
       )
@@ -1245,12 +1383,16 @@ shinyServer(function(input, output, session) {
         # scale = F,
         # split.by = input$DotSampleSepSelect,
         cols = c("lightgrey", "red")
-      ) + RotatedAxis()
+      ) + RotatedAxis()+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$dotPlotXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$dotPlotYtextSize)),
+          legend.text = element_text(size = as.numeric(input$dotPlotLtextSize))
+        )
     }
     
     return(plot_out)
   })
-  
   
   
   observeEvent(input$DotClusterSelection, {
@@ -1296,41 +1438,28 @@ shinyServer(function(input, output, session) {
     sprintf("6.1: Selected %s as Idents for Heatmap Plots: ", cluster)
     # Set the cluster identities based on the selected cluster column in meta data
     Seurat::Idents(data) <- data@meta.data[[cluster]]
-    sprintf("6.2: FindAllMarkers() for Heatmap Plots: ", cluster)
-    markers = FindAllMarkers(data, only.pos = TRUE)
+    data[["RNA"]] <- as(object = data[["RNA"]], Class = "Assay")
+    dataAgg <- AverageExpression(object = data,
+                                 return.seurat = TRUE,
+                                 slot = "data")
+    dataAgg = ScaleData(dataAgg, features = rownames(dataAgg))
     
-    withProgress(message = 'Making plot', value = 0, {
-    # n = length(unique(Idents(data)))
-    setProgress(value = 0.2, detail = "Running FindAllMarkers...")
-    # markers = FindAllMarkers(data, only.pos = TRUE)
     
-    setProgress(value = 0.75, detail = "Subsetting Top Markers")
-    markers %>%
-        group_by(cluster) %>%
-        dplyr::filter(avg_log2FC > 1) %>%
-        slice_head(n = as.numeric(gsub("\\D", "", input$TopFeatures))) %>%
-        ungroup() -> topM
+    p = Seurat::DoHeatmap(
+      dataAgg,
+      features = input$HmapSelectedGenes,
+      draw.lines = FALSE
+    )
     
-    setProgress(value = 0.90, detail = "Making Heat map with top markers")
-      ph = Seurat::DoHeatmap(data, 
-                        features = topM$gene,
-                        label = T,
-                        slot = 'scale.data') + NoLegend()
-      
-      setProgress(value = 1, detail = "Complete") 
-      
-      ph
-    # }
-    # if (input$FeatureSampleSepSelect %in% rownames(data)) {
-    #   Seurat::DoHeatmap(
-    #     data,
-    #     features = input$HeatmapGenes,
-    #     label = T,
-    #     slot = 'scale.data'
-    #   )
-    # } else
-    })
+    p <- wrap_plots(p) + plot_annotation(theme = theme_minimal()) &
+      ggplot2::theme(
+        axis.text.x = element_text(size = as.numeric(input$HmaptXtextSize),angle = 45, hjust = 1),
+        axis.text.y = element_text(size = as.numeric(input$HmapYtextSize)),
+        legend.text = element_text(size = as.numeric(input$HmapLtextSize))
+      )
+    p
   })
+  
   observeEvent(input$HeatmapSelection, {
     output$Heatmap <- renderPlot({
       suppressWarnings({
@@ -1359,11 +1488,306 @@ shinyServer(function(input, output, session) {
       )
     }
   )
+  
+  ## ------------------------------------------------------------------------- ##
+  # 7. Render Scoring Plot
+  Scoring = reactive({
+    data = rds_plotdata()
+    # Set the clustering and sample separation options
+    print("7. Generating required Scoring Plots")
+    cluster <- input$ScoringClusterSelect
+    Seurat::DefaultAssay(data) <- 'RNA'  # Set the assay
+    sprintf("7.1: Selected %s as Idents for Feature Plots: ", cluster)
+    # Set the cluster identities based on the selected cluster column in meta data
+    Seurat::Idents(data) <- data@meta.data[[cluster]]
+    
+    features_list <- NULL
+    if (input$ScoringInputType == "uploadedMarkers") {
+      features_list <- as.vector(input$ScoringSelectedGenes)
+    }
+    
+    # Option 3: Uploaded file
+    else if (input$ScoringInputType == "excelSource") {
+      req(input$ScoringPlotFile)
+      file_path <- input$ScoringPlotFile$datapath
+      file_ext <- tolower(tools::file_ext(input$ScoringPlotFile$name))
+      
+      df <- switch(
+        file_ext,
+        "csv"  = readr::read_csv(file_path, col_types = cols()),
+        "txt"  = readr::read_delim(file_path, delim = "\t", col_types = cols()),
+        "xlsx" = readxl::read_excel(file_path),
+        "xls" = readxl::read_excel(file_path),
+        "gmt" = clusterProfiler::read.gmt(file_path),
+        "tsv" = readr::read_delim(file_path, delim = "\t", col_types = cols()),
+        stop("Unsupported file format")
+      )
+      
+      validate(
+        need(
+          all(c("gene") %in% colnames(df)),
+          "File must contain 'gene' column."
+        )
+      )
+      
+      features_list <- unique(df$gene)
+      gene_types_df <- df
+    }
+    
+    req(features_list)
+    data = Seurat::AddModuleScore(data, features = list(features_list), name = "Score")
+    # Generate the FeaturePlot based on whether sample separation is needed
+    # if (input$FeatureSampleSepSelect %in% rownames(data)) {
+    if (input$ScoringSampleSepSelect == 'None') {
+      p = scCustomize::FeaturePlot_scCustom(
+        data,
+        features = "Score1",
+        keep.scale = 'all',
+        label = T,
+        pt.size = 0.1,
+        combine = TRUE,na_cutoff = NA
+      )
+      
+      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$ScoringXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$ScoringYtextSize)),
+          legend.text = element_text(size = as.numeric(input$ScoringLtextSize))
+        )
+      p
+    }
+    else {
+      sprintf("7.2: Selected %s to Split for Scoring Plots: ",
+              input$ScoringSampleSepSelect)
+      p = scCustomize::FeaturePlot_scCustom(
+        data,
+        features = "Score1",
+        split.by = input$ScoringSampleSepSelect,
+        label = T,
+        pt.size = 0.1,
+        combine = T,na_cutoff = NA
+      )
+      p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
+        ggplot2::theme(
+          axis.text.x = element_text(size = as.numeric(input$ScoringXtextSize)),
+          axis.text.y = element_text(size = as.numeric(input$ScoringYtextSize)),
+          legend.text = element_text(size = as.numeric(input$ScoringLtextSize))
+        )
+      p
+    }
+  })
+  observeEvent(input$ScoringClusterSelection, {
+    output$Scoring <- renderPlot({
+      suppressWarnings({
+        Scoring()
+      })
+    })
+  })
+  
+  output$download_Scoring <- downloadHandler(
+    filename = function() {
+      paste0("cluster_ScoringPlot_",
+             Sys.Date(),
+             "_",
+             Sys.time(),
+             ".pdf")
+    },
+    content = function(file) {
+      plotObject = Scoring()
+      ggsave(
+        filename = file,
+        plot = plotObject,
+        device = "pdf",
+        height = as.numeric(input$scoring_height),
+        width = as.numeric(input$scoring_width),
+        units = "in"
+      )
+    }
+  )
+  
+  ## ------------------------------------------------------------------------- ##
+  # 8. DE Testing
+  # 8. DE Testing
+  de_data = reactive({
+    req(rds_plotdata(), input$DEtestingCluster)
+    
+    data <- rds_plotdata()
+    cluster <- input$DEtestingCluster
+    
+    Seurat::DefaultAssay(data) <- 'RNA'
+    Seurat::Idents(data) <- data@meta.data[[cluster]]
+    
+    data
+  })
+  
+  # 2. Reactive list of cluster choices
+  all_clusters <- reactive({
+    req(de_data())
+    sort(unique(as.character(Seurat::Idents(de_data()))))
+  })
+  
+  # 3. Populate DECluster1 when DEtestingCategory is clicked
+  observeEvent(input$DEtestingCluster, {
+    req(all_clusters())
+    
+    cat("Populating cluster dropdowns\n")
+    
+    updateSelectInput(session, "DECluster1", choices = all_clusters())
+    
+    updateSelectizeInput(session, "DECluster2",
+                         choices = c("vsAll", all_clusters()))
+  })
+  
+  # 4. Update DECluster2 based on DECluster1 (mutual exclusion)
+  observeEvent(input$DECluster1, {
+    req(input$DECluster1, all_clusters())
+    
+    available <- c("vsAll", setdiff(all_clusters(), input$DECluster1))
+    
+    current <- isolate(input$DECluster2)
+    selected <- if (!is.null(current) && current %in% available) current else "vsAll"
+    
+    updateSelectizeInput(session, "DECluster2",
+                         choices = available)
+  }, ignoreInit = TRUE)
+  
+  # 5. Run DE testing only when both clusters are selected
+  DEtestingTable <- reactive({
+    req(de_data(), input$DECluster1, input$DECluster2, input$DEtestingCategory)
+    data <- de_data()
+    
+    ident2 <- if ("vsAll" %in% input$DECluster2) NULL else input$DECluster2
+    
+    showNotification(
+    "Calculating Differentially expressed Markers",
+      type = "message",
+      duration = 2
+    )
+    
+    de.markers <- tryCatch({
+      Seurat::FindMarkers(
+        data,
+        ident.1 = input$DECluster1,
+        ident.2 = ident2
+      )
+    }, error = function(e) {
+      message("FindMarkers failed: ", e$message)
+      NULL
+    })
+    
+    req(de.markers)  # stop cleanly with a clear error if it's NULL
+    
+    de.markers$Gene <- rownames(de.markers)
+    de.markers <- de.markers %>% dplyr::select(Gene, dplyr::everything())
+    rownames(de.markers) <- NULL
+    showNotification(
+      "Calculation Complete",
+      type = "message",
+      duration = 2
+    )
+    de.markers
+  })
+  
+  VolcanoPlot <- reactive({
+    req(DEtestingTable(),input$DECluster1, input$DECluster2, input$DEtestingCategory)
+    # Identifying Up, Down and Non significant
+    df <- DEtestingTable() %>%
+      dplyr::mutate(
+        significance = dplyr::case_when(
+          p_val_adj < 0.05 & avg_log2FC > 0.5  ~ "Up",
+          p_val_adj < 0.05 & avg_log2FC < -0.5 ~ "Down",
+          TRUE                                ~ "NS"
+        ),
+        neg_log10_p = -log10(p_val_adj + 1e-300)  # avoid log(0)
+      )
+    print(head(df))
+    # Get top 10 from Up and Down significant markers
+    top_labels <- df %>%
+      dplyr::filter(significance != "NS") %>%
+      dplyr::group_by(significance) %>%
+      dplyr::slice_min(p_val_adj, n = 10) %>%
+      dplyr::ungroup()
+    print(head(top_labels))
+    # Plotly function
+    plotly::plot_ly(
+      data = df,
+      x = ~avg_log2FC,
+      y = ~neg_log10_p,
+      color = ~significance,
+      colors = c("Up" = "#D0526E", "Down" = "#5A9BD4", "NS" = "grey80"),
+      type = "scatter",
+      mode = "markers",
+      marker = list(size = 5, opacity = 0.6),
+      text = ~paste0("Gene: ", Gene,
+                     "<br>log2FC: ", round(avg_log2FC, 2),
+                     "<br>p_adj: ", signif(p_val_adj, 3)),
+      hoverinfo = "text"
+    ) %>%
+      plotly::add_annotations(
+        data = top_labels,
+        x = ~avg_log2FC, y = ~neg_log10_p, text = ~Gene,
+        showarrow = FALSE,
+        # arrowhead = 2, arrowsize = 0.5,
+        # ax = ~ax, ay = ~ay,
+        font = list(size = 10, color = "rgba(0, 0, 0, 0.8)")
+      ) %>%
+      plotly::layout(
+        title = "Volcano Plot",
+        xaxis = list(title = "log2 Fold Change", zeroline = TRUE),
+        yaxis = list(title = "-log10(adjusted p-value)"),
+        shapes = list(
+          # Vertical threshold lines
+          list(type = "line", x0 = 1, x1 = 1,
+               y0 = 0, y1 = max(df$neg_log10_p),
+               line = list(color = "grey50", dash = "dash", width = 1)),
+          list(type = "line", x0 = -1, x1 = -1,
+               y0 = 0, y1 = max(df$neg_log10_p),
+               line = list(color = "grey50", dash = "dash", width = 1)),
+          # Horizontal p-value line
+          list(type = "line",
+               x0 = min(df$avg_log2FC), x1 = max(df$avg_log2FC),
+               y0 = -log10(0.05), y1 = -log10(0.05),
+               line = list(color = "grey50", dash = "dash", width = 1))
+        ),
+        showlegend = TRUE
+      )
+  })
+  
+  
+# 6. Render the table - this stays "registered" all the time
+output$DEtestingTable <- DT::renderDataTable({
+  DEtestingTable()
+})
 
+output$VolcanoPlot <- renderPlotly({
+  suppressWarnings({
+    VolcanoPlot()
+  })
+})
 
-## ------------------------------------------------------------------------- ##
-# 7.Metadata addition and export New RDS file with added metadata column - conditional Panel in Cell Summary Profile's SAMPLE DESCRIPTION
-## ------------------------------------------------------------------------- ##
+output$download_DEtesting <- downloadHandler(
+  filename = function() {
+    paste0("DEtesting_",
+           Sys.Date(),
+           "_",
+           Sys.time(),
+           ".csv")
+  },
+  content = function(file) {
+    DEObject = DEtestingTable()
+    write.table(
+      DEObject,
+      file,
+      row.names = FALSE,
+      quote = F,
+      sep = '\t',
+      col.names = T
+    )
+  }
+)
+  ## ------------------------------------------------------------------------- ##
+  # 9.Metadata addition and export New RDS file with added metadata column - conditional Panel in Cell Summary Profile's SAMPLE DESCRIPTION
+  ## ------------------------------------------------------------------------- ##
 MetaExport = reactive({
   data = rds_plotdata()
   data
