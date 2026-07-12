@@ -19,39 +19,23 @@ proxy:
     internal-networking: false
     url: http://localhost:2375
   specs:
-    - id: hello
-      display-name: "Hello Shiny"
-      description: "A simple Hello World Shiny app."
-      logo-url: "/images/bioinfo_scientists.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-001-hello:latest
-      port: 3838
-    - id: tabsets
-      display-name: "Tabsets"
-      description: "Demonstrates tabset panels in Shiny."
-      logo-url: "/images/spotlight01.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-006-tabsets:latest
-      port: 3838
-    - id: kmeans
-      display-name: "K-Means Clustering"
-      description: "Interactive K-Means clustering visualization."
-      logo-url: "/images/spotlight02.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-050-kmeans-example:latest
-      port: 3838
-    - id: feavis
-      display-name: "FEAVis"
-      description: "Functional enrichment analysis visualization."
-      logo-url: "/images/spotlight03.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-feavis:latest
-      port: 3838
-    - id: test_yanli
-      display-name: "test1 yan"
-      description: "test demo with zhongyu, operated by Yan"
-      logo-url: "/images/bioinfo_scientists.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-test1:latest
-      port: 3838
     - id: scvizapp
       display-name: "scVizApp"
       description: "scRNASeq Visualization Application"
       logo-url: "/images/bioinfo_scientists.jpg"
       container-image: ghcr.io/zhongyuli2026/shiny-scvizapp:latest
+      port: 3838
+      container-volumes:
+        - /srv/data/scrna_data/:/srv/shiny-server/data/
+    - id: feavisapp
+      display-name: "FeaVis App"
+      description: "Functional enrichment analysis visualization application."
+      container-image: ghcr.io/zhongyuli2026/shiny-feavisapp:latest
+      port: 3838
+      container-volumes:
+        - /srv/data/feavis_data/:/srv/data/feavis_data/
+    - id: tfheatmap
+      display-name: "TFHeatmap"
+      description: "Visualize potential master TFs and gene modules across pathways using DAP-seq TF target data and conservation scores."
+      container-image: ghcr.io/zhongyuli2026/shiny-tfheatmap:latest
       port: 3838

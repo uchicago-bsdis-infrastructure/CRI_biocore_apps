@@ -147,7 +147,9 @@
                           (${app.id == 'tabsets'} ? '/images/spotlight03.jpg' :
                           (${app.id == 'test_yanli'} ? '/images/cuffdiff.jpg' :
                           (${app.id == 'scvizapp'} ? '/images/spotlight04.jpg' :
-                          '/images/banner.jpg'))))">
+                          (${app.id == 'feavisapp'} ? '/images/banner.jpg' :
+                          (${app.id == 'tfheatmap'} ? '/images/banner.jpg' :
+                          '/images/banner.jpg'))">
                 <img th:src="${imgSrc}" th:alt="${app.displayName}" />
             </div>
         </section>

@@ -12,21 +12,15 @@ jobs:
     strategy:
       matrix:
         app:
-          - name: 001-hello
-            image: shiny-001-hello
-          - name: 006-tabsets
-            image: shiny-006-tabsets
-          - name: 050-kmeans-example
-            image: shiny-050-kmeans-example
           - name: DEApp-master
             image: shiny-deapp
-          - name: feavis
-            image: shiny-feavis
-          - name: test1-demo
-            image: shiny-test1
           - name: scvizapp
             image: shiny-scvizapp
-    steps:
+          - name: feavisApp
+            image: shiny-feavisapp
+          - name: TFHeatmap
+            image: shiny-tfheatmap
+   steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
         with:
@@ -57,13 +51,10 @@ jobs:
           sudo /usr/bin/cp -r static/images/. /var/www/biocoreapps/images/
           sudo env LDAP_MANAGER_PASSWORD="$LDAP_MANAGER_PASSWORD" python3 -c "import os; f='/etc/shinyproxy/application.yml'; c=open(f).read().replace('\${LDAP_MANAGER_PASSWORD}',os.environ['LDAP_MANAGER_PASSWORD']); open(f,'w').write(c)"
           echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-001-hello:latest
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-006-tabsets:latest
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-050-kmeans-example:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-deapp:latest
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavis:latest
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-test1:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-scvizapp:latest
+          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavisapp:latest
+          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-tfheatmap:latest
           sudo /usr/bin/systemctl restart shinyproxy
           sudo /usr/bin/systemctl restart shinyproxy-public
           docker system prune -f
