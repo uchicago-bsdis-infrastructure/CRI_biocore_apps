@@ -22,11 +22,11 @@ RUN R -e "install.packages(c('dplyr', 'Seurat', 'SeuratObject', 'stringr', 'tidy
   'renv', 'cowplot', 'ggplot2', 'grid', 'patchwork', 'readr', \
   'readxl', 'reshape2', 'stringi', 'tibble', \
   'shiny', 'tools', 'bslib', 'DT', \
-  'shinydashboard', 'shinyWidgets', 'shinyjs'))"
+  'shinydashboard', 'shinyWidgets', 'shinyjs', 'scCustomize', 'Polychrome', 'viridis', 'viridisLite'))"
 
 # For Bioconductor packages
 RUN R -e "install.packages('BiocManager')"
-# && R -e "BiocManager::install(c('DESeq2', 'edgeR'))"
+# && R -e "BiocManager::install(c('DESeq2', 'edgeR', 'dittoSeq'))"
 
 # Copy app files — the RUN rm line is required to clear default sample apps
 RUN rm -rf /srv/shiny-server/*
