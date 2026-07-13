@@ -24,3 +24,8 @@ proxy:
       logo-url: "/images/deanalysis.jpg"
       container-image: ghcr.io/zhongyuli2026/shiny-deapp:latest
       port: 3838
+    - id: hello_shiny
+      display-name: "Hello Shiny"
+      description: "Classic Shiny demo app — a histogram of the Old Faithful geyser waiting times with an adjustable bin slider."
+      container-image: ghcr.io/zhongyuli2026/shiny-hello-shiny:latest
+      port: 3838
