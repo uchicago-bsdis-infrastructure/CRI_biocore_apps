@@ -514,8 +514,8 @@ shinyServer(function(input, output, session) {
   # Define reactive data directory based on user input
   data_dir <- reactive({
     req(input$projectName)
-    # file.path(getwd(), "data", input$projectName)
-    file.path("/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/data", input$projectName)
+    file.path(getwd(), "data", input$projectName)
+    # file.path("/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/data", input$projectName)
   })
   
   # Handle submit button and validate folder

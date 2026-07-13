@@ -20,6 +20,8 @@ jobs:
             image: shiny-feavisapp
           - name: TFHeatmap
             image: shiny-tfheatmap
+          - name: scvizappPublic
+            image: shiny-scvizapppublic
    steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
@@ -55,6 +57,7 @@ jobs:
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-scvizapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavisapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-tfheatmap:latest
+          docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-scvizapppublic:latest
           sudo /usr/bin/systemctl restart shinyproxy
           sudo /usr/bin/systemctl restart shinyproxy-public
           docker system prune -f

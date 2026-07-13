@@ -322,7 +322,7 @@ umap_plots <- shinyUI(
         fluidRow(
           selectInput(
             inputId = "MdVis",
-            label = "Multi_Dimensionality Option",
+            label = "Dimensionality Reduction Option",
             choices = NULL,
             # choices = c('UMAP','tSNE'),
             # selected = 'UMAP',
@@ -906,7 +906,7 @@ tab_bars = page_navbar(
             navset_tab(
               nav_panel("Samples Description", sample_description),
               nav_panel("Cell Summary", Cell_Summary),
-              nav_panel("MultiDimensional Plots", umap_plots)
+              nav_panel("Dimensionality Reduction Plots", umap_plots)
             )),
   nav_panel("Violin Plots", VlnPlot),
   nav_panel("Feature Plots", FeaturePlot),
