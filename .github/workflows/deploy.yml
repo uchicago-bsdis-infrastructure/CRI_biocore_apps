@@ -40,6 +40,8 @@ jobs:
 
   deploy:
     needs: build-and-push
+    permissions:
+      packages: read
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
@@ -52,12 +54,13 @@ jobs:
           sudo /usr/bin/cp shinyproxy/templates/index.html /etc/shinyproxy/templates/index.html
           sudo /usr/bin/cp -r static/images/. /var/www/biocoreapps/images/
           sudo env LDAP_MANAGER_PASSWORD="$LDAP_MANAGER_PASSWORD" python3 -c "import os; f='/etc/shinyproxy/application.yml'; c=open(f).read().replace('\${LDAP_MANAGER_PASSWORD}',os.environ['LDAP_MANAGER_PASSWORD']); open(f,'w').write(c)"
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/${{ github.repository_owner }}/shiny-scvizapppublic:latest
           echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-deapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-scvizapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-feavisapp:latest
           docker pull ghcr.io/${{ secrets.GHCR_USER }}/shiny-tfheatmap:latest
-          docker pull ghcr.io/${{ github.repository_owner }}/shiny-scvizapppublic:latest
           sudo /usr/bin/systemctl restart shinyproxy
           sudo /usr/bin/systemctl restart shinyproxy-public
           docker system prune -f
