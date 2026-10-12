@@ -25,11 +25,14 @@ RUN R -e "install.packages(c('dplyr', 'Seurat', 'SeuratObject', 'stringr', 'tidy
   'shinydashboard', 'shinyWidgets', 'shinyjs', 'scCustomize', 'Polychrome', 'viridis', 'viridisLite'))"
 
 # For Bioconductor packages
-RUN R -e "install.packages('BiocManager')" \
- && R -e "BiocManager::install('dittoSeq')"
+
+# Install Bioconductor packages
+RUN R -e "install.packages('BiocManager', repos='https://cloud.r-project.org')" \
+ && R -e "BiocManager::install(c('dittoSeq', 'clusterProfiler'), ask=FALSE, update=FALSE)"
 
 # presto is GitHub-only (immunogenomics/presto), not on CRAN/Bioconductor
 RUN R -e "remotes::install_github('immunogenomics/presto')"
+
 
 # Copy app files — the RUN rm line is required to clear default sample apps
 RUN rm -rf /srv/shiny-server/*
