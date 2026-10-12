@@ -10,6 +10,7 @@ library(Polychrome)
 library(viridis)
 library(viridisLite)
 library(scCustomize)
+library(stringr)
 options(warn = -1)
 
 options(shiny.maxRequestSize = 30 * 1024 ^ 3)
@@ -20,10 +21,90 @@ my_cols <- c('3'='#F68282','15'='#31C53F','5'='#1FA195','1'='#B95FBB','13'='#D4D
              '14'='#28CECA','9'='#ff9a36','8'='#2FF18B','11'='#aef','6'='#faf4cf',
              '2'='#CCB1F1','12'='#25aff5','7'='#A4DFF2','4'='#4B4BF7','16'='#AC8F14',
              '10'='#E6C122')
-source('formatRDSFile.R')
+# source('inst/formatRDSFile.R')
 # setwd('/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/') #Remove before push
 ## ---------------------------------------------------------------------------- ##
 
+make_volcano <- function(df, title,
+                         lfc_col  = "logFC",
+                         p_col    = "adj.P.Val",
+                         gene_col = "gene",
+                         lfc_cut  = 0.5,
+                         p_cut    = 0.05,
+                         n_label  = 10) {
+  
+  df <- data.frame(
+    gene  = df[[gene_col]],
+    logFC = df[[lfc_col]],
+    padj  = df[[p_col]],
+    stringsAsFactors = FALSE
+  )
+  df <- df[is.finite(df$logFC) & is.finite(df$padj), ]
+  
+  # avoid Inf when padj is exactly 0
+  df$padj[df$padj == 0] <- .Machine$double.xmin
+  df$negLog10P <- -log10(df$padj)
+  
+  # classify each gene
+  df$status <- "NS"
+  df$status[df$padj < p_cut & df$logFC >=  lfc_cut] <- "Up"
+  df$status[df$padj < p_cut & df$logFC <= -lfc_cut] <- "Down"
+  df$status <- factor(df$status, levels = c("Down", "NS", "Up"))
+  
+  # hover text
+  df$hover <- paste0(
+    "<b>", df$gene, "</b><br>",
+    "log2FC: ", sprintf("%.3f", df$logFC), "<br>",
+    "padj: ", formatC(df$padj, format = "e", digits = 2)
+  )
+  
+  # top 10 up and top 10 down by significance
+  up   <- df[df$status == "Up", ];   up   <- head(up[order(up$padj), ], n_label)
+  down <- df[df$status == "Down", ]; down <- head(down[order(down$padj), ], n_label)
+  top  <- rbind(up, down)
+  
+  cols <- c(Down = "#2166AC", NS = "grey70", Up = "#B2182B")
+  
+  p <- plot_ly() %>%
+    add_markers(
+      data = df, x = ~logFC, y = ~negLog10P,
+      color = ~status, colors = cols,
+      text = ~hover, hoverinfo = "text",
+      marker = list(size = 6, opacity = 0.6)
+    )
+  
+  # labels for top genes (annotations avoid overlapping with the hover layer)
+  if (nrow(top) > 0) {
+    p <- p %>% add_annotations(
+      data = top,
+      x = ~logFC, y = ~negLog10P,
+      text = ~gene,
+      showarrow = TRUE, arrowhead = 0, arrowsize = 0.5, arrowwidth = 0.7,
+      arrowcolor = "grey40",
+      ax = ~ifelse(logFC > 0, 25, -25), ay = -20,
+      font = list(size = 11),
+      bgcolor = "rgba(255,255,255,0.7)"
+    )
+  }
+  
+  p %>% layout(
+    title  = list(text = title),
+    xaxis  = list(title = "log<sub>2</sub> fold change", zeroline = FALSE),
+    yaxis  = list(title = "-log<sub>10</sub> adjusted <i>P</i>"),
+    legend = list(title = list(text = "")),
+    shapes = list(
+      # vertical threshold lines
+      list(type = "line", x0 = -lfc_cut, x1 = -lfc_cut, y0 = 0, y1 = 1,
+           yref = "paper", line = list(dash = "dash", color = "grey50", width = 1)),
+      list(type = "line", x0 =  lfc_cut, x1 =  lfc_cut, y0 = 0, y1 = 1,
+           yref = "paper", line = list(dash = "dash", color = "grey50", width = 1)),
+      # horizontal p-value threshold
+      list(type = "line", x0 = 0, x1 = 1, xref = "paper",
+           y0 = -log10(p_cut), y1 = -log10(p_cut),
+           line = list(dash = "dash", color = "grey50", width = 1))
+    )
+  )
+}
 get_discrete_palette <- function(n, package = "Default", palette_name = NULL) {
   
   if (is.null(n) || n < 1) n <- 1
@@ -437,15 +518,26 @@ dotplot_with_genotype <- function(seurat_obj,
   # Gene type annotation bar (match dotplot features)
   marker_genes_df <- marker_genes_df %>%
     dplyr::filter(gene %in% levels(droplevels(g1$data$features.plot))) %>%
-    dplyr::mutate(gene = factor(gene, levels = levels(droplevels(g1$data$features.plot))))
+    dplyr::mutate(gene = factor(gene, levels = levels(droplevels(g1$data$features.plot)))) %>%
+    dplyr::mutate(geneType = factor(as.character(geneType),
+                                    levels = unique(as.character(geneType))))
   
-  if (is.null(cols)) {
-    cols <- Seurat::DiscretePalette(
-      n = length(unique(marker_genes_df$geneType)),
-      palette = "alphabet"
-    )
+  # if (is.null(cols)) {
+  #   cols <- Seurat::DiscretePalette(
+  #     n = length(unique(marker_genes_df$geneType)),
+  #     palette = "alphabet"
+  #   )
+  # }
+  # order rows by dotplot gene order, then make geneType levels follow it
+  # marker_genes_df <- marker_genes_df %>%
+  #   dplyr::arrange(gene) %>%    # gene is a factor in dotplot order
+  #   dplyr::mutate(geneType = factor(as.character(geneType),
+  #                                   levels = unique(as.character(geneType))))
+  
+  if (is.null(cols) || length(cols) < nlevels(marker_genes_df$geneType)) {
+    cols <- Seurat::DiscretePalette(n = nlevels(marker_genes_df$geneType),
+                                    palette = "alphabet")
   }
-  
   g2 <- ggplot2::ggplot(marker_genes_df) +
     ggplot2::geom_bar(
       mapping = ggplot2::aes(x = gene, y = 1, fill = geneType),
@@ -509,21 +601,21 @@ dotplot_with_genotype <- function(seurat_obj,
 
 
 ## ---------------------------------------------------------------------------- ##
-shinyServer(function(input, output, session) {
-  # 
+app_server = shinyServer(function(input, output, session) {
+  
   # # check input string page
   # currentPage <- reactiveVal("start")
-  # 
+  #
   # output$page <- reactive(currentPage())
   # outputOptions(output, "page", suspendWhenHidden = FALSE)
-  # 
+  #
   # # Define reactive data directory based on user input
   # data_dir <- reactive({
   #   req(input$projectName)
   #   file.path(getwd(), "data", input$projectName)
   #   # file.path("/Users/geethapriyanka/Projects/cytof/CytoF_Data_Analysis/data", input$projectName)
   # })
-  # 
+  #
   # # Handle submit button and validate folder
   # observeEvent(input$submitProject, {
   #   if (dir.exists(data_dir())) {
@@ -536,16 +628,16 @@ shinyServer(function(input, output, session) {
   #     ))
   #   }
   # })
-  # 
-  # # Populate selectInput based on dynamic folder
-  # observe({
-  #   req(currentPage() == "main")  # Only update after page is validated
-  #   req(data_dir())               # Ensure it's available
-  #   file_list <- list.files(data_dir(), pattern = "\\.(rds|RData)$", full.names = FALSE)
-  #   updateSelectInput(session, "RDSFile", choices = file_list)
-  # })
-  # 
-  # 
+  
+  # Populate selectInput based on dynamic folder
+  observe({
+    # req(currentPage() == "main")  # Only update after page is validated
+    # req(data_dir())               # Ensure it's available
+    # file_list <- list.files(data_dir(), pattern = "\\.(rds|RData)$", full.names = FALSE)
+    # updateSelectInput(session, "RDSFile", choices = file_list)
+  })
+  
+  
   
   
   ## -------------------------------------------------------------------------- ##
@@ -562,11 +654,31 @@ shinyServer(function(input, output, session) {
   
   
   
+  
   ## 1. observe 'input$rdsUploadSubmit' to upload the input data file path.
-  rds <- reactiveVal(NULL) 
+  rds <- reactiveVal(NULL)
   uploadedRDSList <- reactiveVal(list())  # Stores all uploaded Seurat objects
   
   # get the list - cell phase
+  # cellPhase_genes <- reactive({
+  #   # Use the 'package' argument so system.file knows where to look
+  #   path1 <- system.file(cellPhase_markers$path, package = "scVizApp")
+  #   path2 <- system.file(cellType_markers$path, package = "scVizApp")
+  #   
+  #   # Ensure files exist before reading
+  #   req(nzchar(path1), nzchar(path2))
+  #   
+  #   gene_list  <- readxl::read_excel(path1, col_names = TRUE)
+  #   gene_list2 <- readxl::read_excel(path2, col_names = TRUE)
+  #   
+  #   rbind(gene_list, gene_list2)
+  # })
+  # 
+  # gene_phases <- reactive({
+  #   req(cellPhase_genes())
+  #   unique(c(cellPhase_genes()$geneType))
+  # })
+  # 
   cellPhase_genes <- reactive({
     req(cellPhase_markers)
     req(cellType_markers)
@@ -584,11 +696,10 @@ shinyServer(function(input, output, session) {
     unique(c(cellPhase_genes()$geneType))
   })
   
-  
   observeEvent(input$rdsUploadSubmit, {
     req(input$RDSFile)
     
-    invalidateLater(500) 
+    invalidateLater(500)
     start_time <- Sys.time()
     
     
@@ -617,24 +728,23 @@ shinyServer(function(input, output, session) {
       # progress$stage <- "loading"
       # progress$percent <- 0
       # progress$message <- "Initializing..."
-      # 
+      #
       updateProgressBar(
         session = session,
         id = "load2",
         value = 10,
         total = 100,
         title = paste("Processing...10%"),
-        status = current_status  
+        status = current_status
       )
       Sys.sleep(0.05)
       
       file_name <- input$RDSFile$name
       file_path <- input$RDSFile$datapath
-      file_ext <- tolower(tools::file_ext(file_name))
-      
-      
+      file_ext  <- tolower(tools::file_ext(file_name))
       rds_file <- switch(file_ext,
                          "rds"   = readRDS(file_path),
+                         "RDS"   = readRDS(file_path),
                          "rdata" = {
                            env <- new.env()
                            load(file_path, envir = env)
@@ -649,7 +759,7 @@ shinyServer(function(input, output, session) {
         value = 40,
         total = 100,
         title = paste("Processing...40%"),
-        status = current_status 
+        status = current_status
       )
       Sys.sleep(0.1)
       
@@ -668,11 +778,11 @@ shinyServer(function(input, output, session) {
         value = 70,
         total = 100,
         title = paste("Processing...70%"),
-        status = current_status  
+        status = current_status
       )
       Sys.sleep(0.1)
       
-      rds_file <- formatRDSFile(rds_file)
+      # rds_file <- formatRDSFile(rds_file)
       
       
       # Save to reactive values
@@ -684,15 +794,16 @@ shinyServer(function(input, output, session) {
       # updateSelectInput(session, "selectedRDS", choices = names(current_list), selected = file_name)
       
       # Update all relevant UI inputs
-      rds_obj <- rds_file
-      metadata_cols <- colnames(rds_obj@meta.data)
-      gene_names <- rownames(rds_obj)
-      reduction_names <- names(rds_obj@reductions)
-      gene_type_choices <- gene_phases()
-      cluster_cols <- metadata_cols[!grepl("nCount|nFeature|percent", metadata_cols)]
-      # cluster_cols <- metadata_cols[stringr::str_detect(metadata_cols,"expCond|orig.ident|cluster|cell|Cell|Cluster|ident|Ident")]
-      
-      req(rds_data())
+      # rds_obj <- rds_file
+      # metadata_cols <- colnames(rds_file@meta.data)
+      # gene_names <- rownames(rds_file)
+      # # print(gene_names)
+      # reduction_names <- names(rds_file@reductions)
+      # gene_type_choices <- gene_phases()
+      # cluster_cols <- metadata_cols[!grepl("nCount|nFeature|percent", metadata_cols)]
+      # # cluster_cols <- metadata_cols[stringr::str_detect(metadata_cols,"expCond|orig.ident|cluster|cell|Cell|Cluster|ident|Ident")]
+      # 
+      # req(rds_data())
       # updateSelectizeInput(session, "Category1", choices = cluster_cols)
       # updateSelectizeInput(session, "Category2", choices = cluster_cols)
       # updateSelectizeInput(session, "MdSplitby", choices = c('None', cluster_cols))
@@ -700,27 +811,28 @@ shinyServer(function(input, output, session) {
       # updateSelectizeInput(session, "FeatureClusterSelect", choices = cluster_cols)
       # updateSelectizeInput(session, "VlnClusterSelect", choices = cluster_cols)
       # updateSelectizeInput(session, "DotClusterSelect", choices = cluster_cols)
+      # updateSelectizeInput(session, "ScoringClusterSelect", choices = cluster_cols)
       # updateSelectizeInput(session, "FeatureSampleSepSelect", choices = c('None', cluster_cols))
       # updateSelectizeInput(session, "VlnSampleSepSelect", choices = c('None', cluster_cols))
       # updateSelectizeInput(session, "DotSampleSepSelect", choices = c('None', cluster_cols))
+      # updateSelectizeInput(session, "ScoringSampleSepSelect", choices = c('None', cluster_cols))
       # updateSelectizeInput(session, "MdVis", choices = reduction_names)
       # updateSelectizeInput(session, "FeatureSelectedGenes", choices = gene_names)
+      # updateSelectizeInput(session, "ScoringSelectedGenes", choices = gene_names)
       # updateSelectizeInput(session, "VlnSelectedGenes", choices = gene_names)
       # updateSelectizeInput(session, "DotSelectedGenes", choices = gene_names)
+      # updateSelectizeInput(session, "HmapSelectedGenes", choices = gene_names)
       # updateSelectizeInput(session, "FeatureSelectedGenesTypes", choices = gene_type_choices)
       # updateSelectizeInput(session, "DotSelectedGenesTypes", choices = gene_type_choices)
-      # updateSelectizeInput(session, "HeatmapGenes", choices = gene_names)
-      # updateSelectizeInput(session, "HeatmapClusterSelect", choices = cluster_cols)
-      # updateSelectizeInput(session, "HeatmapSampleSepSelect", choices = c('None', cluster_cols))
-      # updateSelectizeInput(session, "RefColName", choices = cluster_cols)
-      # 
+      # updateSelectizeInput(session, "HmapSelectedGenes", choices = gene_names)
+      
       updateProgressBar(
         session = session,
         id = "load2",
         value = 80,
         total = 100,
         title = paste("Finalizing...0%"),
-        status = current_status  
+        status = current_status
       )
       Sys.sleep(0.1)
       validation_delay <- min(5, max(0.05, 0.05 * ncol(rds_file)))
@@ -734,6 +846,9 @@ shinyServer(function(input, output, session) {
       output$FeaturePlot <- renderPlot(NULL)
       output$DotPlot <- renderPlot(NULL)
       output$Heatmap <- renderPlot(NULL)
+      # output$DEtestingTable <- DT::renderDataTable(NULL)
+      # output$VolcanoPlot <- renderPlotly(NULL)
+      output$Scoring <- renderPlot(NULL)
       
       updateNavbarPage(session, inputId = "tabs", selected = "Cell Summary Profile")
       
@@ -747,7 +862,7 @@ shinyServer(function(input, output, session) {
         value = 90,
         total = 100,
         title = paste("Finalizing...50%"),
-        status = current_status  
+        status = current_status
       )
       Sys.sleep(0.1)
       # Sys.sleep(validation_delay)
@@ -758,7 +873,7 @@ shinyServer(function(input, output, session) {
         value = 100,
         total = 100,
         title = paste(""),
-        status = current_status 
+        status = current_status
       )
       
       # Sys.sleep(0.05)
@@ -796,7 +911,7 @@ shinyServer(function(input, output, session) {
   })
   rds_plotdata <- reactiveVal(NULL)
   observeEvent(rds_data(),{
-    rds <- rds_data()  
+    rds <- rds_data()
     req(rds)
     
     rds_meta_data <- rds@meta.data
@@ -887,6 +1002,7 @@ shinyServer(function(input, output, session) {
     
     print(paste("Observer triggered - Available columns:",
                 paste(cluster_cols, collapse = ", ")))
+    
     reduction_names <- names(data@reductions)
     gene_names <- rownames(data)
     metadata_cols <- colnames(data@meta.data)
@@ -901,14 +1017,17 @@ shinyServer(function(input, output, session) {
     updateSelectizeInput(session, "FeatureClusterSelect", choices = cluster_cols)
     updateSelectizeInput(session, "VlnClusterSelect", choices = cluster_cols)
     updateSelectizeInput(session, "DotClusterSelect", choices = cluster_cols)
+    updateSelectizeInput(session, "ScoringClusterSelect", choices = cluster_cols)
     updateSelectizeInput(session, "FeatureSampleSepSelect", choices = c('None', cluster_cols))
     updateSelectizeInput(session, "VlnSampleSepSelect", choices = c('None', cluster_cols))
     updateSelectizeInput(session, "DotSampleSepSelect", choices = c('None', cluster_cols))
-    updateSelectizeInput(session, "ScoringSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "ScoringSampleSepSelect", choices = c('None', cluster_cols))
     updateSelectizeInput(session, "MdVis", choices = reduction_names)
     updateSelectizeInput(session, "FeatureSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "ScoringSelectedGenes", choices = gene_names)
     updateSelectizeInput(session, "VlnSelectedGenes", choices = gene_names)
     updateSelectizeInput(session, "DotSelectedGenes", choices = gene_names)
+    updateSelectizeInput(session, "HmapSelectedGenes", choices = gene_names)
     updateSelectizeInput(session, "FeatureSelectedGenesTypes", choices = gene_type_choices)
     updateSelectizeInput(session, "DotSelectedGenesTypes", choices = gene_type_choices)
     updateSelectizeInput(session, "HmapSelectedGenes", choices = gene_names)
@@ -925,10 +1044,10 @@ shinyServer(function(input, output, session) {
   
   # Add visual confirmation that update happened
   observeEvent(list(rds_plotdata(), custom_idents()), {
-    req(rds_plotdata())
+    # req(rds_plotdata())
     
     # showNotification(
-    # "✓ Data updated throughout the app",
+    #   "✓ Data updated throughout the app",
     #   type = "message",
     #   duration = 2
     # )
@@ -942,7 +1061,7 @@ shinyServer(function(input, output, session) {
     print(paste("custom_idents:", custom_idents()))
     
     if (!is.null(try(rds_plotdata(), silent = TRUE))) {
-      print(paste("rds_plotdata columns:", 
+      print(paste("rds_plotdata columns:",
                   paste(colnames(rds_plotdata()@meta.data), collapse = ", ")))
     }
     print("=====================================")
@@ -956,7 +1075,7 @@ shinyServer(function(input, output, session) {
   
   output$sampleDescriptionTable <- DT::renderDataTable({
     req(rds_plotdata())
-    print(paste("Table rendering with columns:", 
+    print(paste("Table rendering with columns:",
                 paste(colnames(rds_plotdata()@meta.data), collapse = ", ")))
     metadata_literature_summary_auto(rds_plotdata())
   }) %>% bindEvent(rds_plotdata(), ignoreNULL = TRUE, ignoreInit = FALSE)
@@ -1080,7 +1199,8 @@ shinyServer(function(input, output, session) {
         reduction = input$MdVis,
         split.by = input$MdSplitby,
         cols = cols,
-        label = TRUE
+        label = TRUE,
+        repel = TRUE
       )+
         ggplot2::theme(
           axis.text.x = element_text(size = as.numeric(input$mdPlotXtextSize)),
@@ -1088,7 +1208,7 @@ shinyServer(function(input, output, session) {
           legend.text = element_text(size = as.numeric(input$mdPlotLtextSize))
         )
     } else {
-      DimPlot(data, reduction = input$MdVis, label = TRUE, cols = cols) +
+      DimPlot(data, reduction = input$MdVis, label = TRUE, cols = cols, repel = TRUE) +
         ggplot2::theme(
           axis.text.x = element_text(size = as.numeric(input$mdPlotXtextSize)),
           axis.text.y = element_text(size = as.numeric(input$mdPlotYtextSize)),
@@ -1096,7 +1216,7 @@ shinyServer(function(input, output, session) {
         )
     }
   })
-  
+  # Render UMAP visualizations
   observeEvent(input$LoadUMAP, {
     output$UMAPPlots <- renderPlot({
       suppressWarnings({
@@ -1105,6 +1225,7 @@ shinyServer(function(input, output, session) {
       })
     })
   })
+  
   
   output$download_UMAPs <- downloadHandler(
     filename = function() {
@@ -1235,9 +1356,10 @@ shinyServer(function(input, output, session) {
         data,
         features = input$FeatureSelectedGenes,
         keep.scale = 'all',
-        label = T,
+        label = T,reduction = 'umap',
         pt.size = 0.1,
-        combine = TRUE
+        combine = TRUE,
+        repel = T
       ) & scale_color_gradientn(colors = cols)
       # p <- wrap_plots(p, ncol = 4) + plot_annotation(theme = theme_minimal())
       p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
@@ -1257,6 +1379,7 @@ shinyServer(function(input, output, session) {
         split.by = input$FeatureSampleSepSelect,
         keep.scale = 'all',
         label = T,
+        reduction = 'umap',
         pt.size = 0.1,
         combine = T
       ) & scale_color_gradientn(colors = cols)
@@ -1399,6 +1522,7 @@ shinyServer(function(input, output, session) {
     
     return(plot_out)
   })
+  
   
   
   observeEvent(input$DotClusterSelection, {
@@ -1549,9 +1673,13 @@ shinyServer(function(input, output, session) {
         data,
         features = "Score1",
         keep.scale = 'all',
+        reduction = "umap",
         label = T,
+        repel = T,
+        split_collect = FALSE,
         pt.size = 0.1,
-        combine = TRUE,na_cutoff = NA
+        combine = TRUE,
+        na_cutoff = NA
       )
       
       p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
@@ -1570,8 +1698,12 @@ shinyServer(function(input, output, session) {
         features = "Score1",
         split.by = input$ScoringSampleSepSelect,
         label = T,
+        reduction = "umap",
         pt.size = 0.1,
-        combine = T,na_cutoff = NA
+        split_collect = FALSE,
+        repel = T,
+        combine = T,
+        na_cutoff = NA
       )
       p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
         ggplot2::theme(
@@ -1613,152 +1745,94 @@ shinyServer(function(input, output, session) {
   
   ## ------------------------------------------------------------------------- ##
   # 8. DE Testing
-  # 8. DE Testing
-  de_data = reactive({
-    req(rds_plotdata(), input$DEtestingCluster)
-    
-    data <- rds_plotdata()
-    cluster <- input$DEtestingCluster
-    
-    Seurat::DefaultAssay(data) <- 'RNA'
-    Seurat::Idents(data) <- data@meta.data[[cluster]]
-    
-    data
-  })
+de_data = reactive({
+  req(rds_plotdata(), input$DEtestingCluster)
   
-  # 2. Reactive list of cluster choices
-  all_clusters <- reactive({
-    req(de_data())
-    sort(unique(as.character(Seurat::Idents(de_data()))))
-  })
+  data <- rds_plotdata()
+  cluster <- input$DEtestingCluster
   
-  # 3. Populate DECluster1 when DEtestingCategory is clicked
-  observeEvent(input$DEtestingCluster, {
-    req(all_clusters())
-    
-    cat("Populating cluster dropdowns\n")
-    
-    updateSelectInput(session, "DECluster1", choices = all_clusters())
-    
-    updateSelectizeInput(session, "DECluster2",
-                         choices = c("vsAll", all_clusters()))
-  })
+  Seurat::DefaultAssay(data) <- 'RNA'
+  Seurat::Idents(data) <- data@meta.data[[cluster]]
   
-  # 4. Update DECluster2 based on DECluster1 (mutual exclusion)
-  observeEvent(input$DECluster1, {
-    req(input$DECluster1, all_clusters())
-    
-    available <- c("vsAll", setdiff(all_clusters(), input$DECluster1))
-    
-    current <- isolate(input$DECluster2)
-    selected <- if (!is.null(current) && current %in% available) current else "vsAll"
-    
-    updateSelectizeInput(session, "DECluster2",
-                         choices = available)
-  }, ignoreInit = TRUE)
+  data
+})
+
+# 2. Reactive list of cluster choices
+all_clusters <- reactive({
+  req(de_data())
+  sort(unique(as.character(Seurat::Idents(de_data()))))
+})
+
+# 3. Populate DECluster1 when DEtestingCategory is clicked
+observeEvent(input$DEtestingCluster, {
+  req(all_clusters())
   
-  # 5. Run DE testing only when both clusters are selected
-  DEtestingTable <- reactive({
-    req(de_data(), input$DECluster1, input$DECluster2, input$DEtestingCategory)
-    data <- de_data()
-    
-    ident2 <- if ("vsAll" %in% input$DECluster2) NULL else input$DECluster2
-    
-    showNotification(
-      "Calculating Differentially expressed Markers",
-      type = "message",
-      duration = 2
+  cat("Populating cluster dropdowns\n")
+  
+  updateSelectInput(session, "DECluster1", choices = all_clusters())
+  
+  updateSelectizeInput(session, "DECluster2",
+                       choices = c("vsAll", all_clusters()))
+})
+
+# 4. Update DECluster2 based on DECluster1 (mutual exclusion)
+observeEvent(input$DECluster1, {
+  req(input$DECluster1, all_clusters())
+  
+  available <- c("vsAll", setdiff(all_clusters(), input$DECluster1))
+  
+  current <- isolate(input$DECluster2)
+  selected <- if (!is.null(current) && current %in% available) current else "vsAll"
+  
+  updateSelectizeInput(session, "DECluster2",
+                       choices = available)
+}, ignoreInit = TRUE)
+
+# 5. Run DE testing only when both clusters are selected
+DEtestingTable <- reactive({
+  req(
+    de_data(),
+    input$DECluster1,
+    input$DECluster2,
+    input$DEtestingCategory
+  )
+  data <- de_data()
+  # 
+  ident2 <- if ("vsAll" %in% input$DECluster2) NULL else input$DECluster2
+
+  de.markers <- tryCatch({
+    Seurat::FindMarkers(
+      data,
+      ident.1 = input$DECluster1,
+      ident.2 = ident2
     )
-    
-    de.markers <- tryCatch({
-      Seurat::FindMarkers(
-        data,
-        ident.1 = input$DECluster1,
-        ident.2 = ident2
-      )
-    }, error = function(e) {
-      message("FindMarkers failed: ", e$message)
-      NULL
-    })
-    
-    req(de.markers)  # stop cleanly with a clear error if it's NULL
-    
-    de.markers$Gene <- rownames(de.markers)
-    de.markers <- de.markers %>% dplyr::select(Gene, dplyr::everything())
-    rownames(de.markers) <- NULL
-    showNotification(
-      "Calculation Complete",
-      type = "message",
-      duration = 2
-    )
-    de.markers
+  }, error = function(e) {
+    message("FindMarkers failed: ", e$message)
+    NULL
   })
+
+  req(de.markers)  # stop cleanly with a clear error if it's NULL
+
+  de.markers$Gene <- rownames(de.markers)
+  de.markers <- de.markers %>% dplyr::select(Gene, dplyr::everything())
+  rownames(de.markers) <- NULL
+  de.markers
+})
+
+VolcanoPlot <- reactive({
+  req(DEtestingTable(),input$DECluster1, input$DECluster2, input$DEtestingCategory)
+  # Identifying Up, Down and Non significant
+  df <- DEtestingTable()
   
-  VolcanoPlot <- reactive({
-    req(DEtestingTable(),input$DECluster1, input$DECluster2, input$DEtestingCategory)
-    # Identifying Up, Down and Non significant
-    df <- DEtestingTable() %>%
-      dplyr::mutate(
-        significance = dplyr::case_when(
-          p_val_adj < 0.05 & avg_log2FC > 0.5  ~ "Up",
-          p_val_adj < 0.05 & avg_log2FC < -0.5 ~ "Down",
-          TRUE                                ~ "NS"
-        ),
-        neg_log10_p = -log10(p_val_adj + 1e-300)  # avoid log(0)
-      )
-    print(head(df))
-    # Get top 10 from Up and Down significant markers
-    top_labels <- df %>%
-      dplyr::filter(significance != "NS") %>%
-      dplyr::group_by(significance) %>%
-      dplyr::slice_min(p_val_adj, n = 10) %>%
-      dplyr::ungroup()
-    print(head(top_labels))
-    # Plotly function
-    plotly::plot_ly(
-      data = df,
-      x = ~avg_log2FC,
-      y = ~neg_log10_p,
-      color = ~significance,
-      colors = c("Up" = "#D0526E", "Down" = "#5A9BD4", "NS" = "grey80"),
-      type = "scatter",
-      mode = "markers",
-      marker = list(size = 5, opacity = 0.6),
-      text = ~paste0("Gene: ", Gene,
-                     "<br>log2FC: ", round(avg_log2FC, 2),
-                     "<br>p_adj: ", signif(p_val_adj, 3)),
-      hoverinfo = "text"
-    ) %>%
-      plotly::add_annotations(
-        data = top_labels,
-        x = ~avg_log2FC, y = ~neg_log10_p, text = ~Gene,
-        showarrow = FALSE,
-        # arrowhead = 2, arrowsize = 0.5,
-        # ax = ~ax, ay = ~ay,
-        font = list(size = 10, color = "rgba(0, 0, 0, 0.8)")
-      ) %>%
-      plotly::layout(
-        title = "Volcano Plot",
-        xaxis = list(title = "log2 Fold Change", zeroline = TRUE),
-        yaxis = list(title = "-log10(adjusted p-value)"),
-        shapes = list(
-          # Vertical threshold lines
-          list(type = "line", x0 = 1, x1 = 1,
-               y0 = 0, y1 = max(df$neg_log10_p),
-               line = list(color = "grey50", dash = "dash", width = 1)),
-          list(type = "line", x0 = -1, x1 = -1,
-               y0 = 0, y1 = max(df$neg_log10_p),
-               line = list(color = "grey50", dash = "dash", width = 1)),
-          # Horizontal p-value line
-          list(type = "line",
-               x0 = min(df$avg_log2FC), x1 = max(df$avg_log2FC),
-               y0 = -log10(0.05), y1 = -log10(0.05),
-               line = list(color = "grey50", dash = "dash", width = 1))
-        ),
-        showlegend = TRUE
-      )
-  })
+  # FindMarkers puts gene names in rownames, so create the column if it's missing
+  if (!"Gene" %in% colnames(df)) df$gene <- rownames(df)
   
+  make_volcano(
+    df, title = paste(input$DECluster1, "vs", input$DECluster2),
+    lfc_col = "avg_log2FC", p_col = "p_val_adj", gene_col = "Gene",
+    lfc_cut = 0.5, p_cut = 0.05, n_label = 10
+  )
+})
   
   # 6. Render the table - this stays "registered" all the time
   output$DEtestingTable <- DT::renderDataTable({
@@ -1898,7 +1972,7 @@ shinyServer(function(input, output, session) {
         Original = data@meta.data[[input$RefColName]],
         Renamed = data@meta.data[[input$NewColName]]
       ))
-    } 
+    }
     # else {
     #   # cat("New column not yet created. Click 'Apply New Names'.\n")
     # }
