@@ -26,7 +26,7 @@ RUN R -e "install.packages(c('dplyr', 'Seurat', 'SeuratObject', 'stringr', 'tidy
 
 # For Bioconductor packages
 RUN R -e "install.packages('BiocManager')"
-# && R -e "BiocManager::install(c('DESeq2', 'edgeR', 'dittoSeq'))"
+# && R -e "BiocManager::install(c('DESeq2', 'edgeR', 'dittoSeq', 'clusterProfiler'))"
 
 # Copy app files — the RUN rm line is required to clear default sample apps
 RUN rm -rf /srv/shiny-server/*

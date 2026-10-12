@@ -1356,7 +1356,8 @@ app_server = shinyServer(function(input, output, session) {
         data,
         features = input$FeatureSelectedGenes,
         keep.scale = 'all',
-        label = T,reduction = 'umap',
+        label = T,
+        reduction = 'umap',
         pt.size = 0.1,
         combine = TRUE,
         repel = T
@@ -1382,7 +1383,7 @@ app_server = shinyServer(function(input, output, session) {
         reduction = 'umap',
         pt.size = 0.1,
         combine = T
-      ) & scale_color_gradientn(colors = cols)
+      ) & scale_color_gradientn(colors = cols) 
       p <- wrap_plots(p) + plot_annotation(theme = theme_minimal())+
         ggplot2::theme(
           axis.text.x = element_text(size = as.numeric(input$FPlotXtextSize)),
