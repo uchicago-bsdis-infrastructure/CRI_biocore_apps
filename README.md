@@ -19,9 +19,10 @@ That's it. Skills in `.claude/commands/` are automatically available in any Clau
 
 ## Available skills
 
-| Command          | What it does                                                           |
-| ---------------- | ---------------------------------------------------------------------- |
-| `/add-shiny-app` | Interactively walks you through adding and registering a new Shiny app |
+| Command             | What it does                                                              |
+| ------------------- | -------------------------------------------------------------------------- |
+| `/add-shiny-app`    | Interactively walks you through adding and registering a new Shiny app     |
+| `/remove-shiny-app` | Interactively walks you through removing an existing Shiny app's registration and (optionally) its files |
 
 ---
 
@@ -153,3 +154,23 @@ Claude: Writing Dockerfile ... done.
 
 - Check the GitHub Actions tab for build/deploy errors
 - Red X → click into the job to read the logs
+
+**Build succeeds but `deploy` job fails on `docker pull` for the new app only (other apps still pull fine)**
+
+This is a registry-owner mismatch, not a real outage. `build-and-push` pushes images to whatever owner is in its `tags:` line (currently `${{ github.repository_owner }}`, the org namespace). The `deploy` job's `docker pull` lines are hardcoded per app — if a new app's pull line uses a different owner expression (e.g. `${{ secrets.GHCR_USER }}`, a personal namespace) than what the build step actually pushed to, the image simply doesn't exist there and you get `manifest unknown`. Old apps keep working because they already have images cached under whatever namespace they were pushed to historically — only brand-new apps expose the mismatch. Fix: make the new app's `docker pull` line (and its `container-image:` in the ShinyProxy config) use the exact same owner expression as the `tags:` line in `build-and-push`.
+
+**`docker pull` fails with `Error response from daemon: denied` for a brand-new app (not `manifest unknown`)**
+
+The image exists, but the GHCR package defaults to **Internal** visibility on first push — readable only by enterprise/org members, not by whatever account the `deploy` job logs in as (e.g. a personal `GHCR_USER` account that isn't an org member). Check the package's own settings page (`.../orgs/<org>/packages/container/package/<image-name>`) — if "Change visibility → Public" is greyed out ("disabled by organization administrators"), the workaround used in this repo is to have the `deploy` job log into GHCR with `${{ secrets.GITHUB_TOKEN }}`/`${{ github.actor }}` for that specific pull (the repo's own token always has read access to its own packages, Internal or not, no org membership required), then re-`docker login` as `GHCR_USER`/`GHCR_TOKEN` for the apps that live under the personal namespace. See `deploy.yml`'s `deploy` job for the pattern — two logins, in that order.
+
+**Push fails with `denied: permission_denied: The token provided does not match expected scopes`**
+
+The credential used by `docker/login-action` in `build-and-push` doesn't have `write:packages` (or, for a fine-grained PAT, Packages: Read and write). If this suddenly starts happening for apps you didn't touch, check whether `deploy.yml`'s login step was recently switched from the auto-generated `${{ secrets.GITHUB_TOKEN }}` to a personal PAT (`${{ secrets.GHCR_USER }}`/`GHCR_TOKEN`) — the auto token always has the right scope for the repo's own packages; a manually-created PAT can expire, get rotated, or simply never have had `write:packages` scope.
+
+**Actions fail with "not allowed... all actions must be from a repository owned by your enterprise"**
+
+Your org's Actions policy allow-lists which third-party actions can run. List every `uses:` line across `.github/workflows/` and ask an org admin to add each one (`actions/checkout@*`, `docker/login-action@*`, etc.) to the allow-list — even GitHub-owned and Verified Creator actions need to be explicitly allowed on some Enterprise configurations, the "Verified Creator" badge alone isn't sufficient.
+
+**Why does this repo's `deploy.yml` do things (dual docker login, explicit registry-owner matching) that other GitHub Actions guides don't mention?**
+
+This repo runs on GitHub Enterprise, which adds governance layers that don't exist on plain GitHub.com: an Actions allow-list, an "Internal" package-visibility tier (invisible outside the org even from a public repo), and org admins can disable the "make public" toggle entirely. All three have bitten this repo at least once — see the entries above.

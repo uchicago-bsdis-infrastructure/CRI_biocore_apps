@@ -28,5 +28,5 @@ proxy:
       display-name: "scVizApp"
       description: "scRNASeq Visualization Application"
       logo-url: "/images/bioinfo_scientists.jpg"
-      container-image: ghcr.io/zhongyuli2026/shiny-scvizapppublic:latest
+      container-image: ghcr.io/uchicago-bsdis-infrastructure/shiny-scvizapppublic:latest
       port: 3838

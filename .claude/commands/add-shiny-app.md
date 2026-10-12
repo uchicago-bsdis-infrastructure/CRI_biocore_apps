@@ -109,8 +109,10 @@ Read `.github/workflows/deploy.yml` first. Then add to **both** locations:
 
 **Deploy step** (10 spaces before `docker`):
 ```yaml
-          docker pull ghcr.io/${{ secrets.GHCR_USER }}/<image-name>:latest
+          docker pull ghcr.io/<registry-owner-expr>/<image-name>:latest
 ```
+
+> **Critical — do not hardcode the registry owner.** This repo's `build-and-push` job has flip-flopped between pushing to `${{ github.repository_owner }}` (the org) and `${{ secrets.GHCR_USER }}` (a personal namespace) — whichever one is *currently* in the `tags:` line of the `docker/build-push-action` step (around line 37) is where images actually land. Before writing the new `docker pull` line, read that `tags:` line and copy its exact owner expression verbatim. A mismatch here doesn't fail loudly at build time — the build succeeds, and only the *deploy* job's `docker pull` for the new app fails (`manifest unknown` or `denied`), while all pre-existing apps keep working because they already have images cached under whichever namespace they were pushed to historically. This bit a real deploy (`scvizappPublic`, 2026-07-13) — confirm the owner expression matches before considering the app "added."
 
 Use spaces only — tabs will break the workflow.
 
@@ -126,9 +128,13 @@ Read the file first, then add:
     - id: <app-id>
       display-name: "<Display Name>"
       description: "<Short description of what the app does.>"
-      container-image: ghcr.io/zhongyuli2026/<image-name>:latest
+      container-image: ghcr.io/<registry-owner-expr>/<image-name>:latest
       port: 3838
 ```
+
+Use the **same literal registry owner** (e.g. `uchicago-bsdis-infrastructure` or `zhongyuli2026`, whichever is currently correct per Step 2) as the `docker pull` line you just added — ShinyProxy launches containers directly from this field at runtime, so it must point at wherever the image was actually pushed, not necessarily whatever an existing app's spec happens to show (existing specs may be stale/inconsistent from past registry-owner changes).
+
+> **New GHCR packages default to private.** The first time an image is pushed under a given owner/name, GitHub creates a new package that only the pushing credential can read by default. If the deploy job's `docker pull` fails with `denied` (not `manifest unknown`) even though the owner expression matches the build's push target, the new package needs its visibility set to Public (or the deploy job's pull account added under the package's **Manage Actions access** with Read role) in GHCR package settings — this is a manual, one-time step outside of git that whoever has org package admin rights needs to do after the first successful build.
 
 If the app needs data files mounted from the server, also add:
 ```yaml
@@ -183,7 +189,7 @@ After all edits are complete, print a summary table:
 | `deploy.yml` name | `<folder-name>` |
 | `deploy.yml` image | `<image-name>` |
 | ShinyProxy id | `<app-id>` |
-| container-image | `ghcr.io/zhongyuli2026/<image-name>:latest` |
+| container-image | `ghcr.io/<registry-owner-expr>/<image-name>:latest` |
 | template app.id | `<app-id>` |
 
 Then remind them:
@@ -191,3 +197,4 @@ Then remind them:
 - Commit and push: `git add . && git commit -m "add <folder-name>" && git push origin yourname`
 - Open a Pull Request on GitHub targeting `main`
 - **Never push directly to `main`** — it triggers an immediate production deployment
+- **After merge, check the Actions run's `deploy` job logs all the way through**, not just whether the run shows green — a registry-owner mismatch or a private-package permission issue on a brand-new image only shows up as a failure on the *last* `docker pull` line, while the build step and every pre-existing app's pull still succeed.
