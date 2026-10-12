@@ -200,10 +200,10 @@ Introduction <- fluidPage(
   ),
   p(),
   p("Click on the link below to access ", strong("scVizApp Test Data"), "to download test data required to work on scVizApp",style = "font-family: Helvetica Neue;"),
-  tags$a("scVizApp Test Data", href = " https://drive.google.com/file/d/1z9oIqS5l_X92Pz2w7vr4spLcvXSlu4Hw/view?usp=share_link", target = "_blank", ),
+  tags$a("scVizApp Test Data", href = "https://drive.google.com/file/d/1prKYu_bkvOS3dzhNu5levhpWLqbbqRlq/view?usp=sharing", target = "_blank", ),
   p(),
   p("Click on the link below to access ", strong("scVizApp Tutorial"), "with detailed step by step protocol to reproduce the analysis",style = "font-family: Helvetica Neue;"),
-  tags$a("scVizApp Tutorial", href = "https://docs.google.com/document/d/14wJ0AMBkk05YkLSoJlVIpaceHFqwRysl/edit?usp=sharing&ouid=104169265426479626636&rtpof=true&sd=true", target = "_blank", ),
+  tags$a("scVizApp Tutorial", href = "https://github.com/geethapriyanka7/scVizApp_WorkshopMaterial", target = "_blank", ),
   p(),
   # p("Navigate through the top navigation bar or action buttons to explore:",style = "font-family: Helvetica Neue;", style = "line-height: 1.4;"),
   # tags$ul(
@@ -789,8 +789,8 @@ Scoring <- shinyUI(
             style = "font-weight: bold"),
           selectInput(
             inputId = "ScoringClusterSelect",
-            label = "Clusters to Visualize (Y axis)",
-            selected = "seurat_clusters",
+            label = "Clusters to Visualize",
+            # selected = "seurat_clusters",
             choices = NULL,
             multiple = FALSE,
             width = '100%'
@@ -866,7 +866,7 @@ DEtesting <- shinyUI(
         ),
         downloadButton("download_DEtesting", "Download table as CSV", class = "action-button-custom")),
       mainPanel(
-        DTOutput("DEtestingTable"),
+        DT::dataTableOutput("DEtestingTable"),
         plotlyOutput("VolcanoPlot", height = "700px", width = "1000px")
       )
       
@@ -929,8 +929,13 @@ tab_bars = page_navbar(
   # nav_menu()
 )
 ## ---------------------------------------------------------------------------- ##
-ui <- shinyUI(fluidPage(tab_bars))
+app_ui <- shinyUI(fluidPage(tab_bars))
 ## --------------------------------------------------------------------------- ##
+run_app <- function(...) {
+  shiny::shinyApp(
+    ui = app_ui(),
+    server = app_server)
+}
 
 ## ---Add project check------------------------------------------------------------------------- ##
 
